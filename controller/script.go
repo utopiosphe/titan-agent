@@ -8,15 +8,11 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
-type ScriptEvent interface {
-	EventType() string
-}
-
 type Script struct {
 	// agent   *Agent
 	fileMD5 string
 
-	eventsChan chan ScriptEvent
+	eventsChan chan luamod.ScriptEvent
 
 	state *lua.LState
 
@@ -29,15 +25,15 @@ type Script struct {
 	processModule *luamod.ProcessModule
 }
 
-func (s *Script) events() <-chan ScriptEvent {
+func (s *Script) events() <-chan luamod.ScriptEvent {
 	return s.eventsChan
 }
 
-func (s *Script) pushEvt(evt ScriptEvent) {
-	s.eventsChan <- evt
+func (s *Script) PushEvent(event luamod.ScriptEvent) {
+	s.eventsChan <- event
 }
 
-func (s *Script) handleEvent(evt ScriptEvent) {
+func (s *Script) handleEvent(evt luamod.ScriptEvent) {
 	switch evt.EventType() {
 	case "timer":
 		e := evt.(*luamod.TimerEvent)
@@ -67,7 +63,7 @@ func (s *Script) handleEvent(evt ScriptEvent) {
 func newScript(scriptFileMD5 string, fileContent []byte) *Script {
 	s := &Script{
 		fileMD5:    scriptFileMD5,
-		eventsChan: make(chan ScriptEvent, 64),
+		eventsChan: make(chan luamod.ScriptEvent, 64),
 	}
 
 	s.state = lua.NewState()
@@ -82,6 +78,17 @@ func newScript(scriptFileMD5 string, fileContent []byte) *Script {
 func (s *Script) start() {
 	ls := s.state
 
+	s.timerModule = luamod.NewTimerModule(s)
+	ls.PreloadModule("timer", s.timerModule.Loader)
+
+	s.downloadModule = luamod.NewDownloaderModule(s)
+	ls.PreloadModule("downloader", s.downloadModule.Loader)
+
+	s.processModule = luamod.NewProcessModule(s)
+	ls.PreloadModule("process", s.processModule.Loader)
+
+	ls.PreloadModule("agent", luamod.NewAgentModule().Loader)
+
 	libs.Preload(ls)
 
 	if s.modTable != nil {
@@ -90,7 +97,7 @@ func (s *Script) start() {
 	}
 }
 
-func (s *Script) hasLuaFunction(funcName string) bool {
+func (s *Script) HasLuaFunction(funcName string) bool {
 	if s.modTable != nil {
 		fn := s.state.GetField(s.modTable, funcName)
 		return fn != nil

@@ -1,12 +1,13 @@
 package main
 
 import (
-	"agent/agent"
+	"agent/controller"
 	"context"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/urfave/cli/v2"
 )
@@ -23,13 +24,6 @@ func main() {
 				Required: true,
 				Value:    "",
 			},
-			&cli.StringFlag{
-				Name:    "script-file-name",
-				Usage:   "--script-file-name script.lua",
-				EnvVars: []string{"SCRIPT_FILE_NAME"},
-				Value:   "script.lua",
-			},
-
 			&cli.IntFlag{
 				Name:    "script-interval",
 				Usage:   "--script-interval 60",
@@ -43,25 +37,37 @@ func main() {
 				Required: true,
 				Value:    "http://localhost:8080/update/lua",
 			},
+			&cli.StringFlag{
+				Name:    "rel-apps-dir",
+				Usage:   "--rel-app-dir apps",
+				EnvVars: []string{"RELATIVE_APPS_DIR"},
+				Value:   "apps",
+			},
+			&cli.StringFlag{
+				Name:    "appconfigs-filename",
+				Usage:   "--appconfigs-filename config.json",
+				EnvVars: []string{"APPCONFIGFS_FILENAME"},
+				Value:   "config.json",
+			},
 		},
 		Before: func(cctx *cli.Context) error {
 			return nil
 		},
 		Action: func(cctx *cli.Context) error {
-			agrs := &agent.AgentArguments{
-				WorkingDir:     cctx.String("working-dir"),
-				ScriptFileName: cctx.String("script-file-name"),
-
-				ScriptInvterval: cctx.Int("script-interval"),
-				ServerURL:       cctx.String("server-url"),
+			agrs := &controller.ConrollerArgs{
+				WorkingDir:            cctx.String("working-dir"),
+				ServerURL:             cctx.String("server-url"),
+				ScriptUpdateInvterval: cctx.Int("script-interval"),
+				AppConfigsFileName:    cctx.String("appconfigs-filename"),
+				RelAppsDir:            cctx.String("rel-apps-dir"),
 			}
 
-			agent, err := agent.New(agrs)
+			ctr, err := controller.New(agrs)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			ctx, done := context.WithCancel(cctx.Context)
+			ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
 			sigChan := make(chan os.Signal, 2)
 			go func() {
 				<-sigChan
@@ -69,7 +75,7 @@ func main() {
 			}()
 
 			signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
-			return agent.Run(ctx)
+			return ctr.Run(ctx)
 		},
 	}
 
