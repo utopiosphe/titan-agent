@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"agent/info"
 	"agent/luamod"
 
 	log "github.com/sirupsen/logrus"
@@ -91,6 +92,8 @@ func (s *Script) start() {
 
 	libs.Preload(ls)
 
+	s.setInfoModule()
+
 	if s.modTable != nil {
 		// exec 'start' funciton in lua mod
 		s.callModFunction0("start")
@@ -165,4 +168,14 @@ func (s *Script) load(fileContent []byte) {
 	}
 
 	s.modTable = ls.ToTable(-1)
+}
+
+func (s *Script) setInfoModule() {
+	ls := s.state
+
+	devInfo := info.GetDevInfo()
+	infoTable := devInfo.ToLuaTable(ls)
+
+	ls.PreloadModule("info", luamod.NewInfoModule(infoTable).Loader)
+
 }

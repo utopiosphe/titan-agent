@@ -2,7 +2,7 @@
     "luaList":[
         {
             "version":"0.1.0",
-            "md5":"702832f9902ac3d372a721dadff03ba7", 
+            "md5":"ee27c5d3aa88abc922abd212e4c5ab2e", 
             "url":"http://192.168.0.154:8080/script2.lua",
             "os": "windows"
         },
@@ -14,7 +14,7 @@
         }
     ],
 
-    "businessList":[
+    "controllerList":[
         {
             "version":"0.1.0",
             "md5":"2dd3c4399fa21bfde740dbfe6853d966", 
@@ -27,6 +27,16 @@
             "url":"http://192.168.0.154:8080/business-android.zip",
             "os": "android"
         }
+    ],
+    "appList":[
+        {
+            "name":"test1",
+            "appDir":"test1",
+            "scriptName":"test1.lua",
+            "scriptMD5":"0413fc327749c48cfe5f5e01916d4c27",
+            "scriptURL":"http://192.168.0.154:8080/test1.lua"
+        }
+    
     ]
 
 

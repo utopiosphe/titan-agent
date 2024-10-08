@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/urfave/cli/v2"
 )
@@ -67,7 +66,7 @@ func main() {
 				log.Fatal(err)
 			}
 
-			ctx, done := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, done := context.WithCancel(context.Background())
 			sigChan := make(chan os.Signal, 2)
 			go func() {
 				<-sigChan

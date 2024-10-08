@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"agent/info"
 	"context"
 	"crypto/md5"
 	"encoding/json"
@@ -291,9 +292,10 @@ func (c *Controller) isAppConfigChange(appConfig1 *AppConfig, appConfig2 *AppCon
 
 func (c *Controller) getAppConfigsFromServer() ([]*AppConfig, error) {
 	// TODO: add query string
-	queryString := ""
+	info := info.GetDevInfo()
+	queryString := info.ToURLQuery()
 
-	url := fmt.Sprintf("%s?%s", c.args.ServerURL, queryString)
+	url := fmt.Sprintf("%s?%s", c.args.ServerURL, queryString.Encode())
 
 	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
 	defer cancel()

@@ -17,7 +17,8 @@ func NewCustomServerMux(config *Config) *CustomServeMux {
 
 	mux := &CustomServeMux{routes: make(map[string]http.Handler)}
 	mux.Handle("/update/lua", http.HandlerFunc(handler.handleLuaUpdate))
-	mux.Handle("/update/business", http.HandlerFunc(handler.handleBusinessUpdate))
+	mux.Handle("/update/controller", http.HandlerFunc(handler.handleControllerUpdate))
+	mux.Handle("/update/apps", http.HandlerFunc(handler.handleAppsUpdate))
 	mux.Handle("/device/list", http.HandlerFunc(handler.handleDeviceList))
 
 	return mux
@@ -77,14 +78,14 @@ func (h *CustomHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) 
 	w.Write(buf)
 }
 
-func (h *CustomHandler) handleBusinessUpdate(w http.ResponseWriter, r *http.Request) {
+func (h *CustomHandler) handleControllerUpdate(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("handleBusinessUpdate, queryString %s\n", r.URL.RawQuery)
 
 	version := r.URL.Query().Get("version")
 	os := r.URL.Query().Get("os")
 
 	var file *File = nil
-	for _, f := range h.config.BusinessFileList {
+	for _, f := range h.config.ControllerFileList {
 		if f.Version == version && f.OS == os {
 			file = f
 			break
@@ -97,6 +98,34 @@ func (h *CustomHandler) handleBusinessUpdate(w http.ResponseWriter, r *http.Requ
 	}
 
 	buf, err := json.Marshal(file)
+	if err != nil {
+		resultError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	w.Write(buf)
+}
+
+func (h *CustomHandler) handleAppsUpdate(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("handleAppsUpdate, queryString %s\n", r.URL.RawQuery)
+
+	// version := r.URL.Query().Get("version")
+	// os := r.URL.Query().Get("os")
+
+	// var file *File = nil
+	// for _, f := range h.config.AppFileList {
+	// 	if f.Version == version && f.OS == os {
+	// 		file = f
+	// 		break
+	// 	}
+	// }
+
+	// if file == nil {
+	// 	resultError(w, http.StatusBadRequest, fmt.Sprintf("can not find the version %s script", version))
+	// 	return
+	// }
+
+	buf, err := json.Marshal(h.config.AppFileList)
 	if err != nil {
 		resultError(w, http.StatusBadRequest, err.Error())
 		return
