@@ -23,10 +23,11 @@ import (
 const ExecTimeout = 10
 
 type AgentModule struct {
+	devInfo *lua.LTable
 }
 
-func NewAgentModule() *AgentModule {
-	am := &AgentModule{}
+func NewAgentModule(info *lua.LTable) *AgentModule {
+	am := &AgentModule{devInfo: info}
 
 	return am
 }
@@ -34,8 +35,8 @@ func NewAgentModule() *AgentModule {
 func (am *AgentModule) Loader(L *lua.LState) int {
 	// register functions to the table
 	var exports = map[string]lua.LGFunction{
-		"fileMD5": am.fileMD5,
-		// "info":           am.info,
+		"fileMD5":        am.fileMD5,
+		"info":           am.info,
 		"extract7z":      am.extract7z,
 		"extractZip":     am.extractZip,
 		"copyDir":        am.copyDir,
@@ -87,17 +88,13 @@ func fileMD5(filePath string) (string, error) {
 	return hex.EncodeToString(md5Bytes), nil
 }
 
-// func (am *AgentModule) info(L *lua.LState) int {
-// 	t := am.agent.devInfo.ToLuaTable(L)
-// 	t.RawSet(lua.LString("workingDir"), lua.LString(am.agent.args.WorkingDir))
-// 	t.RawSet(lua.LString("version"), lua.LString(am.agent.Version()))
-// 	t.RawSet(lua.LString("serverURL"), lua.LString(am.agent.args.ServerURL))
-// 	t.RawSet(lua.LString("scriptFileName"), lua.LString(am.agent.args.ScriptFileName))
-// 	t.RawSet(lua.LString("scriptInvterval"), lua.LNumber(am.agent.args.ScriptInvterval))
-
-// 	L.Push(t)
-// 	return 1
-// }
+func (am *AgentModule) info(L *lua.LState) int {
+	if am.devInfo != nil {
+		L.Push(am.devInfo)
+		return 1
+	}
+	return 0
+}
 
 func (am *AgentModule) extract7z(L *lua.LState) int {
 	filePath := L.CheckString(1)

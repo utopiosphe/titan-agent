@@ -89,11 +89,9 @@ func (s *Script) start() {
 	s.processModule = luamod.NewProcessModule(s)
 	ls.PreloadModule("process", s.processModule.Loader)
 
-	ls.PreloadModule("agent", luamod.NewAgentModule().Loader)
+	s.setAgentModule()
 
 	libs.Preload(ls)
-
-	s.setInfoModule()
 
 	if s.modTable != nil {
 		// exec 'start' funciton in lua mod
@@ -171,12 +169,11 @@ func (s *Script) load(fileContent []byte) {
 	s.modTable = ls.ToTable(-1)
 }
 
-func (s *Script) setInfoModule() {
+func (s *Script) setAgentModule() {
 	ls := s.state
 
 	devInfo := dev.GetDevInfo()
 	infoTable := devInfo.ToLuaTable(ls)
 	infoTable.RawSet(lua.LString("appDir"), lua.LString(s.appDir))
-	ls.PreloadModule("dev", luamod.NewInfoModule(infoTable).Loader)
-
+	ls.PreloadModule("agent", luamod.NewAgentModule(infoTable).Loader)
 }
