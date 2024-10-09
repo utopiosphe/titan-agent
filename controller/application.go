@@ -82,7 +82,8 @@ func (app *Application) renewScript() {
 		oldScript.stop()
 	}
 
-	newScript := newScript(app.scriptFileMD5, app.scriptFileContent)
+	appDir := path.Join(app.args.AppsWorkingDir, app.args.AppConfig.AppDir)
+	newScript := newScript(appDir, app.scriptFileMD5, app.scriptFileContent)
 	newScript.start()
 
 	app.script = newScript

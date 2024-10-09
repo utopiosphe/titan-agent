@@ -2,14 +2,20 @@
     "luaList":[
         {
             "version":"0.1.0",
-            "md5":"ee27c5d3aa88abc922abd212e4c5ab2e", 
-            "url":"http://192.168.0.154:8080/script2.lua",
+            "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
+            "url":"https://agent.titannet.io/script.lua",
             "os": "windows"
         },
         {
             "version":"0.1.0",
-            "md5":"1a4580f23a7857bbc6584d8f55f15fa3", 
-            "url":"http://192.168.0.154:8080/script.lua",
+            "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
+            "url":"https://agent.titannet.io/script.lua",
+            "os": "android"
+        },
+        {
+            "version":"0.1.0",
+            "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
+            "url":"https://agent.titannet.io/script.lua",
             "os": "linux"
         }
     ],
@@ -17,24 +23,30 @@
     "controllerList":[
         {
             "version":"0.1.0",
-            "md5":"2dd3c4399fa21bfde740dbfe6853d966", 
-            "url":"http://192.168.0.154:8080/business-windows.zip",
+            "md5":"91eedb8305ea2bee347babf6f8c49a7e", 
+            "url":"https://agent.titannet.io/controller-windows.zip",
             "os": "windows"
         },
         {
             "version":"0.1.0",
+            "md5":"17c186d754fd3c1a072ca2cb6187354c", 
+            "url":"https://agent.titannet.io/controller-linux.zip",
+            "os": "linux"
+        },
+        {
+            "version":"0.1.0",
             "md5":"f62ee56d38309c42a2f181e9ecdcb4e8", 
-            "url":"http://192.168.0.154:8080/business-android.zip",
+            "url":"https://agent.titannet.io/business-android.zip",
             "os": "android"
         }
     ],
     "appList":[
         {
-            "name":"test1",
-            "appDir":"test1",
-            "scriptName":"test1.lua",
-            "scriptMD5":"0413fc327749c48cfe5f5e01916d4c27",
-            "scriptURL":"http://192.168.0.154:8080/test1.lua"
+            "name":"painetos",
+            "appDir":"painetos",
+            "scriptName":"painetos.lua",
+            "scriptMD5":"40d69d27ba9fceb7dd970ce781110e58",
+            "scriptURL":"https://agent.titannet.io/painetos.lua"
         }
     
     ]

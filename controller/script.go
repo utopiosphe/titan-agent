@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"agent/info"
+	"agent/dev"
 	"agent/luamod"
 
 	log "github.com/sirupsen/logrus"
@@ -10,7 +10,7 @@ import (
 )
 
 type Script struct {
-	// agent   *Agent
+	appDir  string
 	fileMD5 string
 
 	eventsChan chan luamod.ScriptEvent
@@ -61,8 +61,9 @@ func (s *Script) handleEvent(evt luamod.ScriptEvent) {
 	}
 }
 
-func newScript(scriptFileMD5 string, fileContent []byte) *Script {
+func newScript(appDir string, scriptFileMD5 string, fileContent []byte) *Script {
 	s := &Script{
+		appDir:     appDir,
 		fileMD5:    scriptFileMD5,
 		eventsChan: make(chan luamod.ScriptEvent, 64),
 	}
@@ -173,9 +174,9 @@ func (s *Script) load(fileContent []byte) {
 func (s *Script) setInfoModule() {
 	ls := s.state
 
-	devInfo := info.GetDevInfo()
+	devInfo := dev.GetDevInfo()
 	infoTable := devInfo.ToLuaTable(ls)
-
-	ls.PreloadModule("info", luamod.NewInfoModule(infoTable).Loader)
+	infoTable.RawSet(lua.LString("appDir"), lua.LString(s.appDir))
+	ls.PreloadModule("dev", luamod.NewInfoModule(infoTable).Loader)
 
 }

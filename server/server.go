@@ -54,18 +54,18 @@ func (h *CustomHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) 
 		h.devMgr.updateDevice(d)
 	}
 
-	version := r.URL.Query().Get("version")
+	os := r.URL.Query().Get("os")
 
 	var file *File = nil
 	for _, f := range h.config.LuaFileList {
-		if f.Version == version {
+		if f.OS == os {
 			file = f
 			break
 		}
 	}
 
 	if file == nil {
-		resultError(w, http.StatusBadRequest, fmt.Sprintf("can not find the version %s script", version))
+		resultError(w, http.StatusBadRequest, fmt.Sprintf("can not find the os %s script", os))
 		return
 	}
 
@@ -79,21 +79,21 @@ func (h *CustomHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *CustomHandler) handleControllerUpdate(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("handleBusinessUpdate, queryString %s\n", r.URL.RawQuery)
+	fmt.Printf("handleControllerUpdate, queryString %s\n", r.URL.RawQuery)
 
-	version := r.URL.Query().Get("version")
+	// version := r.URL.Query().Get("version")
 	os := r.URL.Query().Get("os")
 
 	var file *File = nil
 	for _, f := range h.config.ControllerFileList {
-		if f.Version == version && f.OS == os {
+		if f.OS == os {
 			file = f
 			break
 		}
 	}
 
 	if file == nil {
-		resultError(w, http.StatusBadRequest, fmt.Sprintf("can not find the version %s script", version))
+		resultError(w, http.StatusBadRequest, fmt.Sprintf("can not find the os %s", os))
 		return
 	}
 
