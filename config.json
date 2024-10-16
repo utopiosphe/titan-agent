@@ -1,18 +1,21 @@
 {
     "luaList":[
         {
+            "name":"windows-script",
             "version":"0.1.0",
             "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
             "url":"https://agent.titannet.io/script.lua",
             "os": "windows"
         },
         {
+            "name":"android-script",
             "version":"0.1.0",
             "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
             "url":"https://agent.titannet.io/script.lua",
             "os": "android"
         },
         {
+            "name":"linux-script",
             "version":"0.1.0",
             "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
             "url":"https://agent.titannet.io/script.lua",
@@ -45,11 +48,34 @@
             "name":"painetos",
             "appDir":"painetos",
             "scriptName":"painetos.lua",
+            "versoin":"0.0.1",
             "scriptMD5":"40d69d27ba9fceb7dd970ce781110e58",
-            "scriptURL":"https://agent.titannet.io/painetos.lua"
+            "scriptURL":"https://agent.titannet.io/painetos.lua",
+            "reqResources":["linuxRes"]
         }
-    
-    ]
+    ],
+    "resources":{
+        "androidRes":{
+            "os":"android",
+            "cpu":0,
+            "memory":0,
+            "disk":0
+
+        },
+        "windowsRes":{
+            "os":"windows",
+            "cpu":0,
+            "memory":0,
+            "disk":0
+            
+        },
+        "linuxRes":{
+            "os":"linux",
+            "cpu":0,
+            "memory":0,
+            "disk":0
+        }
+    }
 
 
 }

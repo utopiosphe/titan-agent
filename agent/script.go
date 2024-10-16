@@ -11,8 +11,8 @@ type ScriptEvent interface {
 }
 
 type Script struct {
-	agent   *Agent
-	fileMD5 string
+	baseInfo *BaseInfo
+	fileMD5  string
 
 	eventsChan chan ScriptEvent
 
@@ -27,7 +27,7 @@ type Script struct {
 	processModule *ProcessModule
 }
 
-func (s *Script) events() <-chan ScriptEvent {
+func (s *Script) Events() <-chan ScriptEvent {
 	return s.eventsChan
 }
 
@@ -35,7 +35,7 @@ func (s *Script) pushEvt(evt ScriptEvent) {
 	s.eventsChan <- evt
 }
 
-func (s *Script) handleEvent(evt ScriptEvent) {
+func (s *Script) HandleEvent(evt ScriptEvent) {
 	switch evt.evtType() {
 	case "timer":
 		e := evt.(*TimerEvent)
@@ -62,9 +62,9 @@ func (s *Script) handleEvent(evt ScriptEvent) {
 	}
 }
 
-func newScript(agent *Agent, scriptFileMD5 string, fileContent []byte) *Script {
+func NewScript(baseInfo *BaseInfo, scriptFileMD5 string, fileContent []byte) *Script {
 	s := &Script{
-		agent:      agent,
+		baseInfo:   baseInfo,
 		fileMD5:    scriptFileMD5,
 		eventsChan: make(chan ScriptEvent, 64),
 	}
@@ -78,7 +78,7 @@ func newScript(agent *Agent, scriptFileMD5 string, fileContent []byte) *Script {
 	return s
 }
 
-func (s *Script) start() {
+func (s *Script) Start() {
 	ls := s.state
 	s.timerModule = newTimerModule(s)
 	ls.PreloadModule("timer", s.timerModule.loader)
@@ -89,7 +89,7 @@ func (s *Script) start() {
 	s.processModule = newProcessModule(s)
 	ls.PreloadModule("process", s.processModule.loader)
 
-	ls.PreloadModule("agent", newAgentModule(s.agent).loader)
+	ls.PreloadModule("agent", newAgentModule(s.baseInfo.ToLuaTable(ls)).loader)
 
 	libs.Preload(ls)
 
@@ -133,7 +133,7 @@ func (s *Script) callModFunction1(funcName string, param0 lua.LValue) {
 	}
 }
 
-func (s *Script) stop() {
+func (s *Script) Stop() {
 	ls := s.state
 	if s.modTable != nil {
 		// exec 'stop' funciton in lua mod

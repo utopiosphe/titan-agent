@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"agent/agent"
 	"context"
 	"crypto/md5"
 	"fmt"
@@ -11,14 +12,15 @@ import (
 )
 
 type AppArguments struct {
-	AppsWorkingDir string
+	ControllerArgs *ConrollerArgs
 	AppConfig      *AppConfig
 }
 
 type Application struct {
-	args *AppArguments
+	baseInfo *agent.BaseInfo
+	args     *AppArguments
 
-	script *Script
+	script *agent.Script
 
 	scriptFileMD5     string
 	scriptFileContent []byte
@@ -29,8 +31,22 @@ type Application struct {
 }
 
 func NewApplication(args *AppArguments) (*Application, error) {
+	controllerInfo := agent.ControllerInfo{
+		WorkingDir:      args.ControllerArgs.WorkingDir,
+		Version:         Version,
+		ServerURL:       args.ControllerArgs.ServerURL,
+		ScriptInvterval: args.ControllerArgs.ScriptUpdateInvterval,
+	}
+	appInfo := &agent.AppInfo{
+		ControllerInfo: controllerInfo,
+		AppRootDir:     path.Join(args.ControllerArgs.WorkingDir, args.ControllerArgs.RelAppsDir),
+		AppDir:         path.Join(args.ControllerArgs.WorkingDir, args.ControllerArgs.RelAppsDir, args.AppConfig.AppDir),
+	}
+	info := agent.NewBaseInfo(nil, appInfo)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	app := &Application{
+		baseInfo:  info,
 		args:      args,
 		stopCh:    make(chan bool),
 		ctx:       ctx,
@@ -59,10 +75,10 @@ func (app *Application) Run() error {
 	for loop {
 		script := app.currentScript()
 		select {
-		case ev := <-script.events():
-			script.handleEvent(ev)
+		case ev := <-script.Events():
+			script.HandleEvent(ev)
 		case <-app.ctx.Done():
-			script.stop()
+			script.Stop()
 			loop = false
 			log.Info("ctx done, Run() will quit")
 		}
@@ -72,25 +88,26 @@ func (app *Application) Run() error {
 	return nil
 }
 
-func (app *Application) currentScript() *Script {
+func (app *Application) currentScript() *agent.Script {
 	return app.script
 }
 
 func (app *Application) renewScript() {
 	oldScript := app.script
 	if oldScript != nil {
-		oldScript.stop()
+		oldScript.Stop()
 	}
 
-	appDir := path.Join(app.args.AppsWorkingDir, app.args.AppConfig.AppDir)
-	newScript := newScript(appDir, app.scriptFileMD5, app.scriptFileContent)
-	newScript.start()
+	// appDir := path.Join(app.args.AppsWorkingDir, app.args.AppConfig.AppDir)
+	script := agent.NewScript(app.baseInfo, app.scriptFileMD5, app.scriptFileContent)
+	script.Start()
 
-	app.script = newScript
+	app.script = script
 }
 
 func (app *Application) loadScript() error {
-	scriptPath := path.Join(app.args.AppsWorkingDir, app.args.AppConfig.AppDir, app.args.AppConfig.ScriptName)
+	controllerArgs := app.args.ControllerArgs
+	scriptPath := path.Join(controllerArgs.WorkingDir, controllerArgs.RelAppsDir, app.args.AppConfig.AppDir, app.args.AppConfig.ScriptName)
 	b, err := os.ReadFile(scriptPath)
 	if err != nil {
 		return err

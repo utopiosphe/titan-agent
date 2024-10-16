@@ -23,11 +23,11 @@ import (
 const ExecTimeout = 10
 
 type AgentModule struct {
-	agent *Agent
+	baseInfo *lua.LTable
 }
 
-func newAgentModule(agent *Agent) *AgentModule {
-	am := &AgentModule{agent: agent}
+func newAgentModule(devInfo *lua.LTable) *AgentModule {
+	am := &AgentModule{baseInfo: devInfo}
 
 	return am
 }
@@ -89,15 +89,21 @@ func fileMD5(filePath string) (string, error) {
 }
 
 func (am *AgentModule) info(L *lua.LState) int {
-	t := am.agent.devInfo.ToLuaTable(L)
-	t.RawSet(lua.LString("workingDir"), lua.LString(am.agent.args.WorkingDir))
-	t.RawSet(lua.LString("version"), lua.LString(am.agent.Version()))
-	t.RawSet(lua.LString("serverURL"), lua.LString(am.agent.args.ServerURL))
-	t.RawSet(lua.LString("scriptFileName"), lua.LString(am.agent.args.ScriptFileName))
-	t.RawSet(lua.LString("scriptInvterval"), lua.LNumber(am.agent.args.ScriptInvterval))
+	if am.baseInfo != nil {
+		L.Push(am.baseInfo)
+		return 1
+	}
 
-	L.Push(t)
-	return 1
+	return 0
+	// t := am.agent.devInfo.ToLuaTable(L)
+	// t.RawSet(lua.LString("workingDir"), lua.LString(am.agent.args.WorkingDir))
+	// t.RawSet(lua.LString("version"), lua.LString(am.agent.Version()))
+	// t.RawSet(lua.LString("serverURL"), lua.LString(am.agent.args.ServerURL))
+	// t.RawSet(lua.LString("scriptFileName"), lua.LString(am.agent.args.ScriptFileName))
+	// t.RawSet(lua.LString("scriptInvterval"), lua.LNumber(am.agent.args.ScriptInvterval))
+
+	// L.Push(t)
+	// return 1
 }
 
 func (am *AgentModule) extract7z(L *lua.LState) int {

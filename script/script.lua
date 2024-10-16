@@ -1,15 +1,23 @@
 local mod = {}
 
 function mod.start()
-    mod.processName = "server.exe"
-    mod.serverURL = "http://localhost:8080/update/business"
-    mod.downloadPackageName = "business.zip"
+    mod.timerInterval = 60
+    mod.processName = "controller"
+    mod.serverURL = "http://agent.titannet.io/update/controller"
+    mod.appsRequestURL = "http://agent.titannet.io/update/apps"
+    mod.downloadPackageName = "controller.zip"
+    mod.extraControllerDir = "controller-extra"
     mod.isUpdate = false
     -- init base info
     mod.getBaseInfo()
 
-    mod.loadLocal()
 
+    if mod.info.os == "windows" then
+        mod.processName = "controller.exe"
+    end
+
+
+    mod.loadLocal()
 
     local checkUpdate = function(isUpdating)
         if not isUpdating then
@@ -37,27 +45,28 @@ function mod.getBaseInfo()
     local info = agent.info()
     if info then
         mod.info = info
+        mod.printTable(info)
     end
 end
 
 function mod.loadLocal()
     local agmod = require("agent")
-    local processAPath = mod.info.wdir .."/A/"..mod.processName
+    local processAPath = mod.info.workingDir .."/A/"..mod.processName
     local processA = mod.loadprocessInfo(processAPath)
     if processA then
-        local downloadPackagePath = mod.info.wdir .."/A/"..mod.downloadPackageName
+        local downloadPackagePath = mod.info.workingDir .."/A/"..mod.downloadPackageName
         processA.md5 = agmod.fileMD5(downloadPackagePath)
         processA.ab = "A"
-        processA.dir = mod.info.wdir .."/A"
+        processA.dir = mod.info.workingDir .."/A"
     end
 
-    local processBPath = mod.info.wdir .."/B/"..mod.processName
+    local processBPath = mod.info.workingDir .."/B/"..mod.processName
     local processB = mod.loadprocessInfo(processAPath)
     if progresB then
-        local downloadPackagePath = mod.info.wdir .."/B/"..mod.downloadPackageName
+        local downloadPackagePath = mod.info.workingDir .."/B/"..mod.downloadPackageName
         processA.md5 = agmod.fileMD5(downloadPackagePath)
         processB.ab = "B"
-        processA.dir = mod.info.wdir .."/B"
+        processA.dir = mod.info.workingDir .."/B"
     end
 
     if processA and processB then
@@ -88,8 +97,9 @@ function mod.loadprocessInfo(filePath)
     process.filePath = filePath
     process.name = mod.processName
 
-    local cmd = require("cmd")
-    local result, err = cmd.exec(filePath.." version")
+    local agmod = require("agent")
+    local command = filePath.." version"
+    local result, err = agmod.exec(command)
     if err then
         print("get version failed "..err)
         return process
@@ -100,8 +110,12 @@ function mod.loadprocessInfo(filePath)
         return process
     end
 
-    print("exec version stdout"..result.stdout)
-    process.version = result.stdout
+    if result.stdout then
+        local strings = require("strings")
+        local version = strings.trim_suffix(result.stdout, "\n")
+        print("mod.loadprocessInfo version "..version)
+        process.version = version
+    end
     return process
 end
 
@@ -143,7 +157,7 @@ function mod.startBusinessJob()
 
     local process = require("process")
     local filePath = mod.process.filePath
-    local cmdString = filePath.." run --listen 0.0.0.0:8000 --config "..mod.process.dir.."/config.json --file-server "..mod.process.dir
+    local cmdString = filePath.." run --working-dir "..mod.info.workingDir.." --server-url "..mod.appsRequestURL.." --uuid "..mod.info.uuid.." --script-interval 60"
     print("cmdString "..cmdString)
     local err = process.createProcess(mod.processName, cmdString)
     if err then
@@ -163,33 +177,92 @@ function mod.stopBusinessJob()
 
 
     local process = require("process")
-    local err = process.killProcess(mod.processName)
-    if err then
-        print("kill process "..mod.processName.." failed "..err)
-        return
-    end
-    print("stop "..mod.processName.." success")
-end
+    local p = process.getProcess(mod.processName)
+    if p then
+        local agmod = require("agent")
+        local result =""
+        local err = ""
+        if mod.info.os == "windows" then
+            result, err = agmod.exec("taskkill /PID "..p.pid.." /F")
+        else
+            result, err = agmod.exec("kill "..p.pid)
+        end
 
+        if err then
+            print("kill "..mod.processName.." failed:"..err)
+        else 
+            print("stop process "..mod.processName)
+        end
+    end
+end
 
 function mod.startTimer()
-    local tmod = require 'timer'
-    tmod.createTimer('monitor', 3, 'onTimerMonitor')
-    tmod.createTimer('update', 3, 'onTimerUpdate')
+    local tmod = require("timer")
+    tmod.createTimer('monitor', mod.timerInterval, 'onTimerMonitor')
+    tmod.createTimer('update', mod.timerInterval, 'onTimerUpdate')
 end
 
-function mod.restartBusinessJob()
-    mod.stopBusinessJob()
-    mod.startBusinessJob()
-end
+-- function mod.restartBusinessJob()
+--     mod.stopBusinessJob()
+--     mod.startBusinessJob()
+-- end
 
 function mod.onTimerMonitor()
     print("onTimerMonitor")
+    if mod.monitorLastActivitTime then
+        if os.difftime(os.time(), mod.monitorLastActivitTime) < mod.timerInterval then
+            print("insufficient time to monitor")
+            return
+        end
+    end
+    mod.monitorLastActivitTime = os.time()
+    
+
+    local process = require("process")
+    if not mod.process then 
+        print("mod.onTimerMonitor process not load")
+        return
+    end
+
+    local p = process.getProcess(mod.processName)
+    if p then
+        print("process "..p.name.." "..p.pid.." running")
+
+        local agmod = require("agent")
+        local command = mod.process.filePath.." version"
+
+        print("command "..command)
+        local result, err = agmod.exec(command)
+        if err then
+            print("check version error "..err)
+        else 
+            if result.status ~= 0 then
+                print("check version err "..result.stderr)
+            else
+                local strings = require("strings")
+                local version = strings.trim_suffix(result.stdout, "\n")
+                print("version "..version)
+            end
+        end
+    else 
+        print("mod.onTimerMonitor process not start, start it")
+        mod.startBusinessJob()
+    end
+
+    local process = require("process")
 end
 
 
 function mod.onTimerUpdate()
     print("onTimerUpdate")
+    if mod.updateLastActivitTime then
+        if os.difftime(os.time(), mod.updateLastActivitTime) < mod.timerInterval then
+            print("insufficient time to update")
+            return
+        end
+    end
+    mod.updateLastActivitTime= os.time()
+
     if mod.isUpdate then
         print("is updating")
         return
@@ -207,9 +280,9 @@ function mod.onTimerUpdate()
 end
 
 function mod.updateFromServer(callback)
-    local result, err = mod.getURLAndMD5()
+    local result, err = mod.getUpdateConfig()
     if err then
-        print("mod.updateFromServer get url and md5 from server "..err)
+        print("mod.updateFromServer get controller update config from server "..err)
         callback(false)
         return
     end
@@ -222,18 +295,23 @@ function mod.updateFromServer(callback)
 
     mod.updateFileMD5 = result.md5 
 
-    local filePath = mod.info.wdir.."/"..mod.downloadPackageName
+    local filePath = mod.info.workingDir.."/"..mod.downloadPackageName
     local dmod = require 'downloader'
-    dmod.createDownloader("update", filePath, result.url, 10, 'onDownloadCallback')
+    local err = dmod.createDownloader("update", filePath, result.url, 'onDownloadCallback', 20)
+    if err then
+        print("create downloader failed "..err)
+        callback(false)
+        return
+    end
     print("create downloader")
     callback(true)
 end
 
-function mod.getURLAndMD5() 
+function mod.getUpdateConfig() 
     local http = require("http")
     local client = http.client({timeout= 10})
 
-    local url = mod.serverURL.."?version="..mod.info.version
+    local url = mod.serverURL.."?version="..mod.info.version.."&os="..mod.info.os.."&uuid="..mod.info.uuid
     local request = http.request("GET", url)
     local result, err = client:do_request(request)
     if err then
@@ -241,7 +319,7 @@ function mod.getURLAndMD5()
     end
 
     if not (result.code == 200) then
-        return nil, "status code "..result.code
+        return nil, "status code "..result.code..", url:"..url
     end
 
     local json = require("json")
@@ -259,10 +337,7 @@ end
 -- update mod.process
 -- restart businessJob
 function mod.onDownloadCallback(result)
-    local agmod = require("downloader")
-    agmod.deleteDownloader("update")
-
-    print("onDownloadCallback")
+    print("onDownloadCallback, result:")
 
     mod.printTable(result)
 
@@ -285,9 +360,9 @@ function mod.onDownloadCallback(result)
     end
 
     mod.updateProcess(result)
-    print("process")
+    print("update process to new:")
     mod.printTable(mod.process)
-    mod.restartBusinessJob()
+    mod.stopBusinessJob()
 
     mod.isUpdate = false
 end
@@ -296,7 +371,14 @@ function mod.updateProcess(downloadResult)
     local agmod = require("agent")
     local goos = require("goos")
 
-    local outputDir = mod.info.wdir.."/business-extra"
+    local outputDir = mod.info.workingDir.."/"..mod.extraControllerDir
+    local err = agmod.removeAll(outputDir)
+    if err then
+        print("mod.updateProcess, removeAll failed "..err)
+        return
+    end
+
+    -- extractZip will create outputDir if not exist
     local err agmod.extractZip(downloadResult.filePath, outputDir)
     if err then
         print("extractZip "..err)
@@ -304,33 +386,48 @@ function mod.updateProcess(downloadResult)
     end
 
     if not mod.process or mod.process.ab == "B" then
-        local dest = mod.info.wdir.."/A"
-        local err = goos.mkdir_all(dest)
+        local dest = mod.info.workingDir.."/A"
+        local err = agmod.removeAll(dest)
         if err then
-            print("mkdir "..dest.." failed "..failed)
+            print("remove dir "..dest.." failed "..err)
             return
         end
 
+        -- copyDir will create dest dir if not exist 
         local err = agmod.copyDir(outputDir, dest)
         if err then
             print("copy "..outputDir.." to "..dest.." failed "..err)
             return
         end
 
+
         local filePath = dest.."/"..mod.downloadPackageName
         local ok, err = os.rename(downloadResult.filePath, filePath)
         if err then
             print("rename failed "..err)
+            return
         end
 
         local processPath = dest.."/"..mod.processName
         local processA = mod.loadprocessInfo(processPath)
+        if not processA then
+            print("file "..processPath.." not exist")
+            return
+        end
         processA.md5 = downloadResult.md5
         processA.ab = "A"
         processA.dir = dest
+        processA.filePath = processPath
         mod.process = processA
     else 
-        local dest = mod.info.wdir.."/B"
+        local dest = mod.info.workingDir.."/B"
+        local err = agmod.removeAll(dest)
+        if err then
+            print("remove dir "..dest.." failed "..err)
+            return
+        end
+
+        -- copyDir will create dest dir if not exist 
         local err = agmod.copyDir(outputDir, dest)
         if err then
             print("copy "..outputDir.." to "..dest.." failed "..err)
@@ -345,13 +442,23 @@ function mod.updateProcess(downloadResult)
 
         local processPath = dest.."/"..mod.processName
         local processB = mod.loadprocessInfo(processPath)
-        processA.md5 = downloadResult.md5
-        processB.ab = "A"
+        if not processB then
+            print("file "..processPath.." not exist")
+            return
+        end
+        processB.md5 = downloadResult.md5
+        processB.ab = "B"
         processB.dir = dest
+        processB.filePath = processPath
         mod.process = processB
     end
 
-    local err = agmod.removeAll(outputDir)
+    local err = agmod.chmod(mod.process.filePath, "0755")
+    if err then
+        print("chmod failed "..err)
+    end
+
+    err = agmod.removeAll(outputDir)
     if err then
         print("remove failed "..err)
     end

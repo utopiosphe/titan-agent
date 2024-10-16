@@ -33,8 +33,8 @@ type Agent struct {
 
 	args *AgentArguments
 
-	devInfo *DevInfo
-	script  *Script
+	baseInfo *BaseInfo
+	script   *Script
 
 	scriptFileMD5     string
 	scriptFileContent []byte
@@ -46,10 +46,17 @@ type UpdateConfig struct {
 }
 
 func New(args *AgentArguments) (*Agent, error) {
+	agentInfo := AgentInfo{
+		WorkingDir:      args.WorkingDir,
+		Version:         version,
+		ServerURL:       args.ServerURL,
+		ScriptFileName:  args.ScriptFileName,
+		ScriptInvterval: args.ScriptInvterval,
+	}
 	agent := &Agent{
 		agentVersion: version,
 		args:         args,
-		devInfo:      GetDevInfo(),
+		baseInfo:     NewBaseInfo(&agentInfo, nil),
 	}
 
 	err := os.MkdirAll(args.WorkingDir, os.ModePerm)
@@ -78,8 +85,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	for loop {
 		script := a.currentScript()
 		select {
-		case ev := <-script.events():
-			script.handleEvent(ev)
+		case ev := <-script.Events():
+			script.HandleEvent(ev)
 		case <-ticker.C:
 			elapsed := time.Since(scriptUpdateTime)
 			if elapsed > scriptUpdateinterval {
@@ -92,7 +99,7 @@ func (a *Agent) Run(ctx context.Context) error {
 				scriptUpdateTime = time.Now()
 			}
 		case <-ctx.Done():
-			script.stop()
+			script.Stop()
 			log.Info("ctx done, Run() will quit")
 			loop = false
 		}
@@ -139,11 +146,11 @@ func (a *Agent) currentScript() *Script {
 func (a *Agent) renewScript() {
 	oldScript := a.script
 	if oldScript != nil {
-		oldScript.stop()
+		oldScript.Stop()
 	}
 
-	newScript := newScript(a, a.scriptFileMD5, a.scriptFileContent)
-	newScript.start()
+	newScript := NewScript(a.baseInfo, a.scriptFileMD5, a.scriptFileContent)
+	newScript.Start()
 
 	a.script = newScript
 }
@@ -161,11 +168,9 @@ func (a *Agent) loadLocal() {
 }
 
 func (a *Agent) getUpdateConfigFromServer() (*UpdateConfig, error) {
-	devInfoQuery := a.devInfo.ToURLQuery()
-	devInfoQuery.Add("version", a.agentVersion)
-	queryString := devInfoQuery.Encode()
+	devInfoQuery := a.baseInfo.ToURLQuery()
 
-	url := fmt.Sprintf("%s?%s", a.args.ServerURL, queryString)
+	url := fmt.Sprintf("%s?%s", a.args.ServerURL, devInfoQuery.Encode())
 
 	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
 	defer cancel()

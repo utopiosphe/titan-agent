@@ -4,11 +4,11 @@ import (
 	"agent/controller"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -58,6 +58,12 @@ var runCmd = &cli.Command{
 			EnvVars: []string{"APPCONFIGFS_FILENAME"},
 			Value:   "config.json",
 		},
+		&cli.StringFlag{
+			Name:    "uuid",
+			Usage:   "--uuid fbf600d4-8ada-11ef-9e79-c3ce2c7cb2d3",
+			EnvVars: []string{"UUID"},
+			Value:   "",
+		},
 	},
 	Before: func(cctx *cli.Context) error {
 		return nil
@@ -69,6 +75,7 @@ var runCmd = &cli.Command{
 			ScriptUpdateInvterval: cctx.Int("script-interval"),
 			AppConfigsFileName:    cctx.String("appconfigs-filename"),
 			RelAppsDir:            cctx.String("rel-apps-dir"),
+			UUID:                  cctx.String("uuid"),
 		}
 
 		ctr, err := controller.New(agrs)
@@ -89,6 +96,14 @@ var runCmd = &cli.Command{
 }
 
 func main() {
+	log.AddHook(&controller.LogHook{
+		Fields: log.Fields{
+			"app":     "controller",
+			"version": controller.Version,
+		},
+		LogLevels: log.AllLevels,
+	})
+
 	commands := []*cli.Command{
 		runCmd,
 		versionCmd,

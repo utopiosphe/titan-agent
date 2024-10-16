@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+type Controller struct {
+	Version          string
+	LastActivityTime time.Time
+}
+
 type Device struct {
 	UUID                string
 	AndroidID           string
@@ -28,6 +33,8 @@ type Device struct {
 	Baseboard       string
 
 	LastActivityTime time.Time
+
+	Controller *Controller
 }
 
 func NewDeviceFromURLQuery(values url.Values) *Device {

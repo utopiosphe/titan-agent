@@ -67,7 +67,8 @@ func (pm *ProcessModule) createProcessStub(L *lua.LState) int {
 
 	_, exist := pm.processMap[name]
 	if exist {
-		return 0
+		L.Push(lua.LString(fmt.Sprintf("Process %s already exist", name)))
+		return 1
 	}
 
 	env := pm.parseEnv(envStr)
@@ -102,6 +103,9 @@ func (tm *ProcessModule) parseEnv(envStr string) []string {
 	return strings.Split(envStr, " ")
 }
 
+// killProcessStub not wait Process stop
+// Process.Wait() will wait in other goroutine
+// if start same name process, must wait process to stop complete
 func (tm *ProcessModule) killProcessStub(L *lua.LState) int {
 	name := L.ToString(1)
 	process, exist := tm.processMap[name]
@@ -111,7 +115,7 @@ func (tm *ProcessModule) killProcessStub(L *lua.LState) int {
 
 	process.cmd.Process.Kill()
 
-	delete(tm.processMap, name)
+	// delete(tm.processMap, name)
 
 	return 0
 }

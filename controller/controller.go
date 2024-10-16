@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"agent/dev"
+	"agent/agent"
 	"context"
 	"crypto/md5"
 	"encoding/json"
@@ -26,6 +26,7 @@ type ConrollerArgs struct {
 	ServerURL             string
 	RelAppsDir            string
 	AppConfigsFileName    string
+	UUID                  string
 }
 
 type App struct {
@@ -34,6 +35,7 @@ type App struct {
 }
 
 type Controller struct {
+	baseInfo      *agent.BaseInfo
 	args          *ConrollerArgs
 	appConfigs    []*AppConfig
 	appConfigsMD5 string
@@ -41,7 +43,17 @@ type Controller struct {
 }
 
 func New(args *ConrollerArgs) (*Controller, error) {
-	c := &Controller{apps: make(map[string]*App), args: args}
+	// new apps
+	controllerInfo := agent.ControllerInfo{
+		WorkingDir:      args.WorkingDir,
+		Version:         Version,
+		ServerURL:       args.ServerURL,
+		ScriptInvterval: args.ScriptUpdateInvterval,
+		UUID:            args.UUID,
+	}
+	info := agent.NewBaseInfo(nil, &agent.AppInfo{ControllerInfo: controllerInfo})
+
+	c := &Controller{apps: make(map[string]*App), args: args, baseInfo: info}
 
 	appsDir := path.Join(args.WorkingDir, args.RelAppsDir)
 	err := os.MkdirAll(appsDir, os.ModePerm)
@@ -108,9 +120,8 @@ func (c *Controller) newApps() {
 		return
 	}
 
-	appsWorkingDir := path.Join(c.args.WorkingDir, c.args.RelAppsDir)
 	for _, appConfig := range c.appConfigs {
-		app, err := NewApplication(&AppArguments{AppsWorkingDir: appsWorkingDir, AppConfig: appConfig})
+		app, err := NewApplication(&AppArguments{ControllerArgs: c.args, AppConfig: appConfig})
 		if err != nil {
 			log.Errorf("Controller.newApps NewApplication failed:%s", err.Error())
 			continue
@@ -152,11 +163,10 @@ func (c *Controller) renewApps() {
 	}
 
 	// new apps
-	appsWorkingDir := path.Join(c.args.WorkingDir, c.args.RelAppsDir)
 	for _, appConfig := range c.appConfigs {
 		_, ok := c.apps[appConfig.AppName]
 		if !ok {
-			app, err := NewApplication(&AppArguments{AppsWorkingDir: appsWorkingDir, AppConfig: appConfig})
+			app, err := NewApplication(&AppArguments{ControllerArgs: c.args, AppConfig: appConfig})
 			if err != nil {
 				log.Errorf("Controller.newApps NewApplication failed:%s", err.Error())
 				continue
@@ -206,7 +216,7 @@ func (c *Controller) updateAppsFromServer() error {
 	}
 
 	if !c.isAppsChange(newAppConfigs) {
-		return fmt.Errorf("apps not change")
+		return fmt.Errorf("apps config no change")
 	}
 
 	for _, appConfig := range newAppConfigs {
@@ -292,9 +302,7 @@ func (c *Controller) isAppConfigChange(appConfig1 *AppConfig, appConfig2 *AppCon
 }
 
 func (c *Controller) getAppConfigsFromServer() ([]*AppConfig, error) {
-	// TODO: add query string
-	info := dev.GetDevInfo()
-	queryString := info.ToURLQuery()
+	queryString := c.baseInfo.ToURLQuery()
 
 	url := fmt.Sprintf("%s?%s", c.args.ServerURL, queryString.Encode())
 
