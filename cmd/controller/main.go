@@ -64,12 +64,31 @@ var runCmd = &cli.Command{
 			EnvVars: []string{"UUID"},
 			Value:   "",
 		},
+		&cli.StringFlag{
+			Name:    "log-file",
+			Usage:   "--log-file /path/to/logfile",
+			EnvVars: []string{"LOG_FILE"},
+			Value:   "",
+		},
 	},
 	Before: func(cctx *cli.Context) error {
 		return nil
 	},
 	Action: func(cctx *cli.Context) error {
-		agrs := &controller.ConrollerArgs{
+		// set log file
+		logFile := cctx.String("log-file")
+		if len(logFile) != 0 {
+			file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+			if err != nil {
+				log.Fatalf("open file %s, failed:%s", logFile, err.Error())
+			}
+			defer file.Close()
+
+			log.SetOutput(file)
+			os.Stdout = file
+		}
+
+		args := &controller.ConrollerArgs{
 			WorkingDir:            cctx.String("working-dir"),
 			ServerURL:             cctx.String("server-url"),
 			ScriptUpdateInvterval: cctx.Int("script-interval"),
@@ -78,7 +97,7 @@ var runCmd = &cli.Command{
 			UUID:                  cctx.String("uuid"),
 		}
 
-		ctr, err := controller.New(agrs)
+		ctr, err := controller.New(args)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -96,14 +115,6 @@ var runCmd = &cli.Command{
 }
 
 func main() {
-	log.AddHook(&controller.LogHook{
-		Fields: log.Fields{
-			"app":     "controller",
-			"version": controller.Version,
-		},
-		LogLevels: log.AllLevels,
-	})
-
 	commands := []*cli.Command{
 		runCmd,
 		versionCmd,

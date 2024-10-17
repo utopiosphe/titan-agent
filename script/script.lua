@@ -29,8 +29,6 @@ function mod.start()
     mod.isUpdate = true
     mod.updateFromServer(checkUpdate)
 
-    -- mod.startBusinessJob()
-
     mod.startTimer()
 
 end
@@ -155,10 +153,15 @@ function mod.startBusinessJob()
         return
     end
 
-    local process = require("process")
+    local logFilePath = mod.proces.dir.."/log"
     local filePath = mod.process.filePath
-    local cmdString = filePath.." run --working-dir "..mod.info.workingDir.." --server-url "..mod.appsRequestURL.." --uuid "..mod.info.uuid.." --script-interval 60"
+
+    local cmdString = filePath.." run --working-dir "..mod.info.workingDir.." --server-url "..mod.appsRequestURL
+    cmdString = cmdString.." --uuid "..mod.info.uuid.." --script-interval 60".." --log-file "..logFilePath
+    
     print("cmdString "..cmdString)
+
+    local process = require("process")
     local err = process.createProcess(mod.processName, cmdString)
     if err then
         print("start "..filePath.." failed "..err)
@@ -385,78 +388,53 @@ function mod.updateProcess(downloadResult)
         return
     end
 
+    local dest = mod.info.workingDir.."/B"
+    local ab = "B"
     if not mod.process or mod.process.ab == "B" then
-        local dest = mod.info.workingDir.."/A"
-        local err = agmod.removeAll(dest)
-        if err then
-            print("remove dir "..dest.." failed "..err)
-            return
-        end
-
-        -- copyDir will create dest dir if not exist 
-        local err = agmod.copyDir(outputDir, dest)
-        if err then
-            print("copy "..outputDir.." to "..dest.." failed "..err)
-            return
-        end
-
-
-        local filePath = dest.."/"..mod.downloadPackageName
-        local ok, err = os.rename(downloadResult.filePath, filePath)
-        if err then
-            print("rename failed "..err)
-            return
-        end
-
-        local processPath = dest.."/"..mod.processName
-        local processA = mod.loadprocessInfo(processPath)
-        if not processA then
-            print("file "..processPath.." not exist")
-            return
-        end
-        processA.md5 = downloadResult.md5
-        processA.ab = "A"
-        processA.dir = dest
-        processA.filePath = processPath
-        mod.process = processA
-    else 
-        local dest = mod.info.workingDir.."/B"
-        local err = agmod.removeAll(dest)
-        if err then
-            print("remove dir "..dest.." failed "..err)
-            return
-        end
-
-        -- copyDir will create dest dir if not exist 
-        local err = agmod.copyDir(outputDir, dest)
-        if err then
-            print("copy "..outputDir.." to "..dest.." failed "..err)
-            return
-        end
-
-        local filePath = dest.."/"..mod.downloadPackageName
-        local ok, err = os.rename(downloadResult.filePath, filePath)
-        if err then
-            print("rename failed "..err)
-        end
-
-        local processPath = dest.."/"..mod.processName
-        local processB = mod.loadprocessInfo(processPath)
-        if not processB then
-            print("file "..processPath.." not exist")
-            return
-        end
-        processB.md5 = downloadResult.md5
-        processB.ab = "B"
-        processB.dir = dest
-        processB.filePath = processPath
-        mod.process = processB
+        dest = mod.info.workingDir.."/A"
+        ab = "A"
     end
 
-    local err = agmod.chmod(mod.process.filePath, "0755")
+    -- local dest = mod.info.workingDir.."/A"
+    local err = agmod.removeAll(dest)
+    if err then
+        print("remove dir "..dest.." failed "..err)
+        return
+    end
+
+    -- copyDir will create dest dir if not exist 
+    local err = agmod.copyDir(outputDir, dest)
+    if err then
+        print("copy "..outputDir.." to "..dest.." failed "..err)
+        return
+    end
+
+
+    local filePath = dest.."/"..mod.downloadPackageName
+    local ok, err = os.rename(downloadResult.filePath, filePath)
+    if err then
+        print("rename failed "..err)
+        return
+    end
+
+    local processPath = dest.."/"..mod.processName
+    local err = agmod.chmod(processPath, "0755")
     if err then
         print("chmod failed "..err)
+        return
     end
+
+    local process = mod.loadprocessInfo(processPath)
+    if not process then
+        print("file "..processPath.." not exist")
+        return
+    end
+
+    process.md5 = downloadResult.md5
+    process.ab = ab
+    process.dir = dest
+    process.filePath = processPath
+    mod.process = process
 
     err = agmod.removeAll(outputDir)
     if err then
