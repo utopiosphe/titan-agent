@@ -430,7 +430,7 @@ func (am *AgentModule) runBashCmd(L *lua.LState) int {
 
 	switch runtime.GOOS {
 	case "linux", "darwin", "android":
-		cmd = exec.Command("sh", "-c", command)
+		cmd = exec.Command("/bin/sh", "-c", command)
 	case "windows":
 		cmd = exec.Command("cmd.exe", "/C", command)
 	default:

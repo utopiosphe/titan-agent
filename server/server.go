@@ -111,15 +111,15 @@ func (h *ServerHandler) handleControllerUpdate(w http.ResponseWriter, r *http.Re
 	if testNode != nil {
 		testControllerName = testNode.Controller
 	}
-
+	log.Infof("testNode:", testNode)
 	var file *File = nil
 	for _, f := range h.config.ControllerFileList {
-		if len(testControllerName) > 0 && f.Name == testControllerName {
-			file = f
-			break
-		}
-
-		if f.OS == os {
+		if len(testControllerName) > 0 {
+			if f.Name == testControllerName {
+				file = f
+				break
+			}
+		} else if f.OS == os {
 			file = f
 			break
 		}
