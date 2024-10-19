@@ -3,56 +3,96 @@
         {
             "name":"windows-script",
             "version":"0.1.0",
-            "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
+            "md5":"aabdb7ccc2dec108addd4fc1c717fd91", 
             "url":"https://agent.titannet.io/script.lua",
             "os": "windows"
         },
         {
             "name":"android-script",
             "version":"0.1.0",
-            "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
+            "md5":"aabdb7ccc2dec108addd4fc1c717fd91", 
             "url":"https://agent.titannet.io/script.lua",
             "os": "android"
         },
         {
             "name":"linux-script",
             "version":"0.1.0",
-            "md5":"d4759b02a40bfa25b4146ac7bc43896f", 
+            "md5":"aabdb7ccc2dec108addd4fc1c717fd91", 
             "url":"https://agent.titannet.io/script.lua",
             "os": "linux"
+        },
+        {
+            "name":"test-script",
+            "version":"0.1.0",
+            "md5":"aabdb7ccc2dec108addd4fc1c717fd91", 
+            "url":"https://agent.titannet.io/empty-script.lua"
         }
     ],
 
     "controllerList":[
         {
+            "name":"windows-controller",
             "version":"0.1.0",
-            "md5":"91eedb8305ea2bee347babf6f8c49a7e", 
+            "md5":"290df524446565fb674155c86f0369aa", 
             "url":"https://agent.titannet.io/controller-windows.zip",
             "os": "windows"
         },
         {
+            "name":"linux-controller",
             "version":"0.1.0",
-            "md5":"17c186d754fd3c1a072ca2cb6187354c", 
+            "md5":"6dcd0a8d5a201aa9523bc5ab33a40c45", 
             "url":"https://agent.titannet.io/controller-linux.zip",
             "os": "linux"
         },
         {
+            "name":"android-controller",
             "version":"0.1.0",
-            "md5":"f62ee56d38309c42a2f181e9ecdcb4e8", 
-            "url":"https://agent.titannet.io/business-android.zip",
+            "md5":"f302846949edf09f2bc465fc08149bb7", 
+            "url":"https://agent.titannet.io/controller-android.zip",
             "os": "android"
         }
     ],
+
     "appList":[
         {
             "name":"painetos",
             "appDir":"painetos",
             "scriptName":"painetos.lua",
             "versoin":"0.0.1",
-            "scriptMD5":"40d69d27ba9fceb7dd970ce781110e58",
+            "scriptMD5":"cf59c90b1604f3a4197009f248e9ed2d",
             "scriptURL":"https://agent.titannet.io/painetos.lua",
             "reqResources":["linuxRes"]
+        },
+	    {
+            "name":"windows-test",
+            "appDir":"windows-test",
+            "scriptName":"windows-test.lua",
+            "versoin":"0.0.1",
+            "scriptMD5":"3b12180a5050d006e991a7c1a9d6da41",
+            "scriptURL":"https://agent.titannet.io/windows-test.lua",
+            "reqResources":["windowsRes"]
+        },
+
+	    {
+            "name":"android-airship",
+            "appDir":"airship",
+            "scriptName":"airship.lua",
+            "versoin":"0.0.1",
+            "scriptMD5":"585f384ec97532e9822b7863ddeb958a",
+            "scriptURL":"https://agent.titannet.io/android-airship.lua",
+            "reqResources":["androidRes"]
+        },
+        {
+            "name":"test-airship",
+            "appDir":"airship",
+            "scriptName":"airship.lua",
+            "versoin":"0.0.1",
+            "scriptMD5":"585f384ec97532e9822b7863ddeb958a",
+            "scriptURL":"https://agent.titannet.io/android-airship.lua"
         }
+
+
+
     ],
     "resources":{
         "androidRes":{
@@ -67,7 +107,7 @@
             "cpu":0,
             "memory":0,
             "disk":0
-            
+
         },
         "linuxRes":{
             "os":"linux",
@@ -75,6 +115,19 @@
             "memory":0,
             "disk":0
         }
+    },
+    "testNodes": {
+        "8B1982CC-1F25-11B2-A85C-EFDE82D4A41A":{
+            "luaScript":"test-script",
+            "controller":"android-controller",
+            "apps":["test-airship"]
+        },
+        "e3f85c83-926a-4e47-ac55-2d39bc013e65":{
+            "luaScript":"test-script",
+                "controller":"android-controller",
+                "apps":["test-airship"]
+        }
+    
     }
 
 

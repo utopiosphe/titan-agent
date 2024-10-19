@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -44,6 +45,7 @@ func (am *AgentModule) loader(L *lua.LState) int {
 		"execWithDetach": am.execWithDetach,
 		"chmod":          am.chmod,
 		"exec":           am.exec,
+		"runBashCmd":     am.runBashCmd,
 	}
 
 	mod := L.SetFuncs(L.NewTable(), exports)
@@ -378,6 +380,63 @@ func (am *AgentModule) exec(L *lua.LState) int {
 		cmd = exec.Command(newArgs[0], newArgs[1:]...)
 	} else {
 		cmd = exec.Command(newArgs[0])
+	}
+
+	stdout, stderr := bytes.Buffer{}, bytes.Buffer{}
+	cmd.Stderr = &stderr
+	cmd.Stdout = &stdout
+
+	if err := cmd.Start(); err != nil {
+		L.Push(lua.LNil)
+		L.Push(lua.LString(err.Error()))
+		return 2
+	}
+
+	done := make(chan error)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case <-time.After(timeout):
+		go cmd.Process.Kill()
+		L.Push(lua.LNil)
+		L.Push(lua.LString(`execute timeout`))
+		return 2
+	case err := <-done:
+		result := L.NewTable()
+		L.SetField(result, "stdout", lua.LString(stdout.String()))
+		L.SetField(result, "stderr", lua.LString(stderr.String()))
+		L.SetField(result, "status", lua.LNumber(-1))
+
+		if err != nil {
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+					L.SetField(result, "status", lua.LNumber(int64(status.ExitStatus())))
+				}
+			}
+		} else {
+			L.SetField(result, "status", lua.LNumber(0))
+		}
+		L.Push(result)
+		return 1
+	}
+}
+
+func (am *AgentModule) runBashCmd(L *lua.LState) int {
+	command := L.CheckString(1)
+	timeout := time.Duration(L.OptInt64(2, ExecTimeout)) * time.Second
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "linux", "darwin", "android":
+		cmd = exec.Command("sh", "-c", command)
+	case "windows":
+		cmd = exec.Command("cmd.exe", "/C", command)
+	default:
+		L.Push(lua.LNil)
+		L.Push(lua.LString(`unsupported os`))
+		return 2
 	}
 
 	stdout, stderr := bytes.Buffer{}, bytes.Buffer{}

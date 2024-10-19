@@ -6,8 +6,8 @@ function mod.start()
     mod.timerInterval = 30
     mod.appName = "airship-agent"
     mod.supplierID = "106465"
-    mod.downloadURL = "https://agent.titannet.io/airship-agent-android-arm-latest"
-    mod.md5URL = "https://agent.titannet.io/airship-agent-android-arm-latest.md5"
+    mod.downloadURL = "https://iaas.ppfs.io/airship/airship-agent-android-arm-latest"
+    mod.md5URL = "https://iaas.ppfs.io/airship/airship-agent-android-arm-latest.md5"
 
     mod.getBaseInfo()
     
@@ -124,7 +124,7 @@ end
 
 function mod.fetchAirshipApp(url, filePath) 
     local http = require("http")
-    local client = http.client({timeout=60})
+    local client = http.client({timeout=300})
 
     local request = http.request("GET", url)
     local result, err = client:do_request(request)
@@ -147,7 +147,7 @@ end
 
 function mod.fetchAirshipAppMd5(url) 
     local http = require("http")
-    local client = http.client({timeout=60})
+    local client = http.client({timeout=300})
 
     local request = http.request("GET", url)
     local result, err = client:do_request(request)
@@ -179,6 +179,7 @@ function mod.onTimerMonitor()
 
     
     if not mod.isAirshipExist() then
+        mod.print("airship not install, try to install it")
         mod.installAirship()
     end
 

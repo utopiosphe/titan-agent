@@ -1,22 +1,23 @@
-local mod = {luaScriptName="android-airship.lua"}
+local mod = {luaScriptName="android-titan-l3.lua"}
 
 function mod.start()
     mod.print("mod.start")
 
     mod.timerInterval = 30
-    mod.appName = "airship-agent"
+    mod.appName = "titan-l3"
     mod.supplierID = "106465"
-    mod.downloadURL = "https://agent.titannet.io/airship-agent-android-arm-latest"
-    mod.md5URL = "https://agent.titannet.io/airship-agent-android-arm-latest.md5"
+    mod.downloadURL = "http://agent.titannet.io/titan-l3-arm32"
+    mod.titanLocatorURL = "https://cassini-locator.titannet.io:5000/rpc/v0"
+    -- mod.md5URL = "https://iaas.ppfs.io/airship/airship-agent-android-arm-latest.md5"
 
     mod.getBaseInfo()
     
-    if not mod.isAirshipExist() then
-        mod.installAirship()
+    if not mod.isTitanL3Exist() then
+        mod.installTitanL3()
     end
 
-    if not mod.isAirshipStart() then
-        mod.startAirship()
+    if not mod.isTitanL3Start() then
+        mod.startTitanL3()
     end 
     
     mod.startTimer()
@@ -28,7 +29,7 @@ function mod.stop()
 end
 
 
-function mod.isAirshipExist()
+function mod.isTitanL3Exist()
     local appPath = mod.info.appDir .."/"..mod.appName
     local goos = require("goos")
     local stat, err = goos.stat(appPath)
@@ -38,30 +39,14 @@ function mod.isAirshipExist()
     return true
 end
 
-function mod.installAirship()
+function mod.installTitanL3()
     local agmod = require("agent")
     local strings = require("strings")
 
     local appPath = mod.info.appDir .."/"..mod.appName
-    local err = mod.fetchAirshipApp(mod.downloadURL, appPath)
+    local err = mod.fetchTitanL3App(mod.downloadURL, appPath)
     if err then
-        mod.print("fetchAirshipApp failed:"..err)
-        return
-    end
-
-    local md5, err = mod.fetchAirshipAppMd5(mod.md5URL)
-    if err then
-        mod.print("fetchAirshipAppMd5 failed:"..err)
-        agmod.removeAll(appPath)
-        return
-    end
-
-    mod.print("mod.installAirship, origin file md5 ["..md5.."]")
-
-    local fileMD5 = agmod.fileMD5(appPath)
-    if not strings.contains(md5, fileMD5) then
-        mod.print("mod.installAirship, install app failed: origin file md5 "..md5..", get file md5 "..fileMD5)
-        agmod.removeAll(appPath)
+        mod.print("fetchTitanL3App failed:"..err)
         return
     end
 
@@ -72,7 +57,7 @@ function mod.installAirship()
     end
 end
 
-function mod.isAirshipStart()
+function mod.isTitanL3Start()
     local agent = require("agent")
     local result, err = agent.exec("/bin/pgrep "..mod.appName)
     if err then
@@ -81,8 +66,7 @@ function mod.isAirshipStart()
     end
 
     if result.status ~= 0 then
-        mod.print("pgrep "..mod.appName.." failed, status:"..result.status..", err:"..result.stderr)
-        return false
+        mod.print("pgrep "..mod.appName.." failed:"..result.stderr)
     end
 
     if result.stdout and result.stdout ~= "" then
@@ -91,25 +75,20 @@ function mod.isAirshipStart()
     return false
 end
 
-function mod.startAirship()
-    if not mod.isAirshipExist() then
-        mod.print("startAirship failed, airship not exist")
+function mod.startTitanL3()
+    if not mod.isTitanL3Exist() then
         return
     end
 
-    local agent = require("agent")
-    local goos = require("goos")
-
-    local airshipWorksapce = mod.info.appDir .."/workspace"
-    local err = goos.mkdir_all(airshipWorksapce)
-    if err then
-        mod.print(err)
-        return
-    end
-
+    -- titan-l3-arm32 --edge-repo /data/unencrypted/.titan/workspace/apps/titan-l3/.titan daemon start --init --url https://cassini-locator.titannet.io:5000/rpc/v0
+    local logPath = mod.info.appDir.."/"..mod.appName..".log"
+    local repoPath = mod.info.appDir.."/.titan"
     local appPath = mod.info.appDir .."/"..mod.appName
-    local command = appPath.." serve --workspace "..airshipWorksapce.." --class box --supplier-id "..mod.supplierID.." --supplier-device-id "..mod.info.androidSerialNumber
-    local result, err = agent.exec(command)
+    local command = "nohup "..appPath.." --edge-repo "..repoPath.." daemon start --init --url "..mod.titanLocatorURL.." > "..logPath.." 2>&1 &"
+    mod.print("command:"..command)
+
+    local cmd = require("cmd")
+    local result, err = cmd.exec(command)
     if err then
         mod.print(err)
         return
@@ -122,7 +101,7 @@ function mod.startAirship()
     mod.print("start "..appPath)
 end
 
-function mod.fetchAirshipApp(url, filePath) 
+function mod.fetchTitanL3App(url, filePath) 
     local http = require("http")
     local client = http.client({timeout=60})
 
@@ -145,22 +124,22 @@ function mod.fetchAirshipApp(url, filePath)
     return nil
 end
 
-function mod.fetchAirshipAppMd5(url) 
-    local http = require("http")
-    local client = http.client({timeout=60})
+-- function mod.fetchAirshipAppMd5(url) 
+--     local http = require("http")
+--     local client = http.client({timeout=300})
 
-    local request = http.request("GET", url)
-    local result, err = client:do_request(request)
-    if err then
-        return nil, err
-    end
+--     local request = http.request("GET", url)
+--     local result, err = client:do_request(request)
+--     if err then
+--         return nil, err
+--     end
 
-    if not (result.code == 200) then
-        return nil, "status code "..result.code..", url:"..url
-    end
+--     if not (result.code == 200) then
+--         return nil, "status code "..result.code..", url:"..url
+--     end
 
-    return result.body, nil
-end
+--     return result.body, nil
+-- end
 
 function mod.startTimer()
     local tmod = require("timer")
@@ -168,7 +147,7 @@ function mod.startTimer()
 end
 
 function mod.onTimerMonitor()
-    mod.print("mod.onTimerMonitor")
+    mod.print("mod.onTimerMonitor android-airship.lua")
     if mod.monitorLastActivitTime then
         if os.difftime(os.time(), mod.monitorLastActivitTime) < mod.timerInterval then
             mod.print("insufficient time to monitor")
@@ -178,15 +157,15 @@ function mod.onTimerMonitor()
     mod.monitorLastActivitTime = os.time()
 
     
-    if not mod.isAirshipExist() then
-        mod.installAirship()
+    if not mod.isTitanL3Exist() then
+        mod.installTitanL3()
     end
 
-    if not mod.isAirshipStart() then
-        mod.print("airship not start, try to start it")
-        mod.startAirship()
+    if not mod.isTitanL3Start() then
+        mod.print("titianL3 not start, try to start it")
+        mod.startTitanL3()
     else 
-        mod.print("airship is running")
+        mod.print("titianL3 is running")
     end 
 end
 

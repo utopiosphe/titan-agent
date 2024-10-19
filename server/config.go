@@ -10,13 +10,17 @@ type Config struct {
 	ControllerFileList []*File              `json:"controllerList"`
 	AppFileList        []*App               `json:"appList"`
 	Resources          map[string]*Resource `json:"resources"`
+	NodeTags           map[string][]string  `json:"nodeTags"`
+	TestNodes          map[string]*TestApp  `json:"testNodes"`
 }
 
 type File struct {
+	Name    string `json:"name"`
 	Version string `json:"version"`
 	MD5     string `json:"md5"`
 	URL     string `json:"url"`
 	OS      string `json:"os"`
+	Tag     string `json:"tag"`
 }
 
 type App struct {
@@ -28,6 +32,7 @@ type App struct {
 	ScriptMD5    string   `json:"scriptMD5"`
 	ScriptURL    string   `json:"scriptURL"`
 	ReqResources []string `json:"reqResources"`
+	Tag          string   `json:"tag"`
 }
 
 type Resource struct {
@@ -36,6 +41,12 @@ type Resource struct {
 	MinCPU      int    `json:"minCPU"`
 	MinMemoryMB int64  `json:"minMemoryMB"`
 	MinDiskGB   int64  `json:"minDiskGB"`
+}
+
+type TestApp struct {
+	LuaScript  string   `json:"luaScript"`
+	Controller string   `json:"controller"`
+	Apps       []string `json:"apps"`
 }
 
 func ParseConfig(filePath string) (*Config, error) {
@@ -51,5 +62,4 @@ func ParseConfig(filePath string) (*Config, error) {
 	}
 
 	return &config, nil
-
 }

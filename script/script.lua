@@ -1,6 +1,8 @@
-local mod = {}
+local mod = {luaScriptName="script.lua"}
 
 function mod.start()
+    mod.print("mod.start")
+
     mod.timerInterval = 60
     mod.processName = "controller"
     mod.serverURL = "http://agent.titannet.io/update/controller"
@@ -43,7 +45,7 @@ function mod.getBaseInfo()
     local info = agent.info()
     if info then
         mod.info = info
-        mod.printTable(info)
+        mod.print(info)
     end
 end
 
@@ -79,8 +81,6 @@ function mod.loadLocal()
     elseif progresB then
         mod.process = processB
     end
-
-    -- mod.printTable(mod.process)
 end
 
 function mod.loadprocessInfo(filePath)
@@ -99,19 +99,19 @@ function mod.loadprocessInfo(filePath)
     local command = filePath.." version"
     local result, err = agmod.exec(command)
     if err then
-        print("get version failed "..err)
+        mod.print("get version failed "..err)
         return process
     end
 
     if result.status ~= 0 then
-        print("get version failed "..result.stderr)
+        mod.print("get version failed "..result.stderr)
         return process
     end
 
     if result.stdout then
         local strings = require("strings")
         local version = strings.trim_suffix(result.stdout, "\n")
-        print("mod.loadprocessInfo version "..version)
+        mod.print("mod.loadprocessInfo version "..version)
         process.version = version
     end
     return process
@@ -149,17 +149,17 @@ end
 
 function mod.startBusinessJob()
     if not mod.process then
-        print("start process "..mod.processName.." not exit")
+        mod.print("start process "..mod.processName.." not exit")
         return
     end
 
-    local logFilePath = mod.proces.dir.."/log"
+    local logFilePath = mod.process.dir.."/log"
     local filePath = mod.process.filePath
 
     local cmdString = filePath.." run --working-dir "..mod.info.workingDir.." --server-url "..mod.appsRequestURL
     cmdString = cmdString.." --uuid "..mod.info.uuid.." --script-interval 60".." --log-file "..logFilePath
     
-    print("cmdString "..cmdString)
+    mod.print("cmdString "..cmdString)
 
     local process = require("process")
     local err = process.createProcess(mod.processName, cmdString)
@@ -169,12 +169,12 @@ function mod.startBusinessJob()
         return
     end
 
-    print("start "..filePath.." success")
+    mod.print("start "..filePath.." success")
 end
 
 function mod.stopBusinessJob()
     if not mod.process then
-        print("stop process "..mod.processName.." not exit")
+        mod.print("stop process "..mod.processName.." not exit")
         return
     end
 
@@ -192,9 +192,9 @@ function mod.stopBusinessJob()
         end
 
         if err then
-            print("kill "..mod.processName.." failed:"..err)
+            mod.print("kill "..mod.processName.." failed:"..err)
         else 
-            print("stop process "..mod.processName)
+            mod.print("stop process "..mod.processName)
         end
     end
 end
@@ -211,10 +211,10 @@ end
 -- end
 
 function mod.onTimerMonitor()
-    print("onTimerMonitor")
+    mod.print("onTimerMonitor")
     if mod.monitorLastActivitTime then
         if os.difftime(os.time(), mod.monitorLastActivitTime) < mod.timerInterval then
-            print("insufficient time to monitor")
+            mod.print("insufficient time to monitor")
             return
         end
     end
@@ -223,32 +223,32 @@ function mod.onTimerMonitor()
 
     local process = require("process")
     if not mod.process then 
-        print("mod.onTimerMonitor process not load")
+        mod.print("mod.onTimerMonitor process not load")
         return
     end
 
     local p = process.getProcess(mod.processName)
     if p then
-        print("process "..p.name.." "..p.pid.." running")
+        mod.print("process "..p.name.." "..p.pid.." running")
 
         local agmod = require("agent")
         local command = mod.process.filePath.." version"
 
-        print("command "..command)
+        mod.print("command "..command)
         local result, err = agmod.exec(command)
         if err then
-            print("check version error "..err)
+            mod.print("check version error "..err)
         else 
             if result.status ~= 0 then
-                print("check version err "..result.stderr)
+                mod.print("check version err "..result.stderr)
             else
                 local strings = require("strings")
                 local version = strings.trim_suffix(result.stdout, "\n")
-                print("version "..version)
+                mod.print("version "..version)
             end
         end
     else 
-        print("mod.onTimerMonitor process not start, start it")
+        mod.print("mod.onTimerMonitor process not start, start it")
         mod.startBusinessJob()
     end
 
@@ -257,17 +257,17 @@ end
 
 
 function mod.onTimerUpdate()
-    print("onTimerUpdate")
+    mod.print("onTimerUpdate")
     if mod.updateLastActivitTime then
         if os.difftime(os.time(), mod.updateLastActivitTime) < mod.timerInterval then
-            print("insufficient time to update")
+            mod.print("insufficient time to update")
             return
         end
     end
     mod.updateLastActivitTime= os.time()
 
     if mod.isUpdate then
-        print("is updating")
+        mod.print("is updating")
         return
     end
 
@@ -285,13 +285,13 @@ end
 function mod.updateFromServer(callback)
     local result, err = mod.getUpdateConfig()
     if err then
-        print("mod.updateFromServer get controller update config from server "..err)
+        mod.print("mod.updateFromServer get controller update config from server "..err)
         callback(false)
         return
     end
 
     if mod.process and mod.process.md5 == result.md5 then
-        print("mod.updateFromServer process already update")
+        mod.print("mod.updateFromServer process already update")
         callback(false)
         return
     end
@@ -302,11 +302,11 @@ function mod.updateFromServer(callback)
     local dmod = require 'downloader'
     local err = dmod.createDownloader("update", filePath, result.url, 'onDownloadCallback', 20)
     if err then
-        print("create downloader failed "..err)
+        mod.print("create downloader failed "..err)
         callback(false)
         return
     end
-    print("create downloader")
+    mod.print("create downloader")
     callback(true)
 end
 
@@ -340,31 +340,31 @@ end
 -- update mod.process
 -- restart businessJob
 function mod.onDownloadCallback(result)
-    print("onDownloadCallback, result:")
+    mod.print("onDownloadCallback, result:")
 
-    mod.printTable(result)
+    mod.print(result)
 
     if not result then
         mod.isUpdate = false
-        print("result == nil")
+        mod.print("result == nil")
         return
     end
 
     if result.err ~= "" then
         mod.isUpdate = false
-        print(result.err)
+        mod.print(result.err)
         return
     end
 
     if result.md5 ~= mod.updateFileMD5 then
-        print("download update file md5 not match")
+        mod.print("download update file md5 not match")
         mod.isUpdate = false
         return
     end
 
     mod.updateProcess(result)
-    print("update process to new:")
-    mod.printTable(mod.process)
+    mod.print("update process to new:")
+    mod.print(mod.process)
     mod.stopBusinessJob()
 
     mod.isUpdate = false
@@ -377,14 +377,14 @@ function mod.updateProcess(downloadResult)
     local outputDir = mod.info.workingDir.."/"..mod.extraControllerDir
     local err = agmod.removeAll(outputDir)
     if err then
-        print("mod.updateProcess, removeAll failed "..err)
+        mod.print("mod.updateProcess, removeAll failed "..err)
         return
     end
 
     -- extractZip will create outputDir if not exist
     local err agmod.extractZip(downloadResult.filePath, outputDir)
     if err then
-        print("extractZip "..err)
+        mod.print("extractZip "..err)
         return
     end
 
@@ -398,14 +398,14 @@ function mod.updateProcess(downloadResult)
     -- local dest = mod.info.workingDir.."/A"
     local err = agmod.removeAll(dest)
     if err then
-        print("remove dir "..dest.." failed "..err)
+        mod.print("remove dir "..dest.." failed "..err)
         return
     end
 
     -- copyDir will create dest dir if not exist 
     local err = agmod.copyDir(outputDir, dest)
     if err then
-        print("copy "..outputDir.." to "..dest.." failed "..err)
+        mod.print("copy "..outputDir.." to "..dest.." failed "..err)
         return
     end
 
@@ -413,20 +413,20 @@ function mod.updateProcess(downloadResult)
     local filePath = dest.."/"..mod.downloadPackageName
     local ok, err = os.rename(downloadResult.filePath, filePath)
     if err then
-        print("rename failed "..err)
+        mod.print("rename failed "..err)
         return
     end
 
     local processPath = dest.."/"..mod.processName
     local err = agmod.chmod(processPath, "0755")
     if err then
-        print("chmod failed "..err)
+        mod.print("chmod failed "..err)
         return
     end
 
     local process = mod.loadprocessInfo(processPath)
     if not process then
-        print("file "..processPath.." not exist")
+        mod.print("file "..processPath.." not exist")
         return
     end
 
@@ -438,19 +438,22 @@ function mod.updateProcess(downloadResult)
 
     err = agmod.removeAll(outputDir)
     if err then
-        print("remove failed "..err)
+        mod.print("remove failed "..err)
     end
 end
 
-function mod.printTable(t)
-    if not t then
-        print(t)
-        return
+function mod.print(msg)
+    local logLeve = "info"
+    if type(msg) == "table" then
+        local tableMsg = "{\n"
+        for key, value in pairs(msg) do
+            tableMsg = string.format("%s %s:%s\n", tableMsg, key, value)
+        end
+        msg = string.format("%s %s", tableMsg,"}")
+         
     end
-
-    for key, value in pairs(t) do
-        print(key, value)
-    end
+    
+    print(string.format('time="%s" leve=%s lua=%s msg="%s"', os.date("%Y-%m-%dT%H:%M:%S"), logLeve, mod.luaScriptName, msg))
 end
 
 

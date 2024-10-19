@@ -80,6 +80,7 @@ func (c *Controller) Run(ctx context.Context) error {
 				err := c.updateAppsFromServer()
 				if err == nil {
 					c.renewApps()
+					log.Infof("Controller.Run updateAppsFromServer renew apps")
 				} else {
 					log.Infof("Controller.Run updateAppsFromServer %s", err.Error())
 				}

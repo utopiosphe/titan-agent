@@ -35,6 +35,8 @@ type Device struct {
 	LastActivityTime time.Time
 
 	Controller *Controller
+
+	IP string
 }
 
 func NewDeviceFromURLQuery(values url.Values) *Device {

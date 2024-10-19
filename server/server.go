@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -57,14 +58,28 @@ func (h *ServerHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) 
 
 	d := NewDeviceFromURLQuery(r.URL.Query())
 	if d != nil {
+		d.IP, _, _ = net.SplitHostPort(r.RemoteAddr)
 		h.devMgr.updateDevice(d)
 	}
 
 	os := r.URL.Query().Get("os")
+	uuid := r.URL.Query().Get("uuid")
 
+	var testScripName string
+	testNode := h.config.TestNodes[uuid]
+	if testNode != nil {
+		testScripName = testNode.LuaScript
+	}
+
+	log.Printf("testNode %#v", testNode)
 	var file *File = nil
 	for _, f := range h.config.LuaFileList {
-		if f.OS == os {
+		if len(testScripName) > 0 {
+			if f.Name == testScripName {
+				file = f
+				break
+			}
+		} else if f.OS == os {
 			file = f
 			break
 		}
@@ -89,9 +104,21 @@ func (h *ServerHandler) handleControllerUpdate(w http.ResponseWriter, r *http.Re
 
 	// version := r.URL.Query().Get("version")
 	os := r.URL.Query().Get("os")
+	uuid := r.URL.Query().Get("uuid")
+
+	var testControllerName string
+	testNode := h.config.TestNodes[uuid]
+	if testNode != nil {
+		testControllerName = testNode.Controller
+	}
 
 	var file *File = nil
 	for _, f := range h.config.ControllerFileList {
+		if len(testControllerName) > 0 && f.Name == testControllerName {
+			file = f
+			break
+		}
+
 		if f.OS == os {
 			file = f
 			break
@@ -117,9 +144,21 @@ func (h *ServerHandler) handleAppsUpdate(w http.ResponseWriter, r *http.Request)
 
 	h.updateDeviceInfo(r)
 
+	uuid := r.URL.Query().Get("uuid")
+
+	var testApps []string
+	testNode := h.config.TestNodes[uuid]
+	if testNode != nil {
+		testApps = testNode.Apps
+	}
+
 	appList := make([]*App, 0, len(h.config.AppFileList))
 	for _, app := range h.config.AppFileList {
-		if h.isResourceMatchApp(r, app.ReqResources) {
+		if len(testApps) > 0 {
+			if h.isTestApp(app.AppName, testApps) {
+				appList = append(appList, app)
+			}
+		} else if h.isResourceMatchApp(r, app.ReqResources) {
 			appList = append(appList, app)
 		}
 	}
@@ -149,6 +188,20 @@ func (h *ServerHandler) isResourceMatchApp(r *http.Request, reqResources []strin
 			return true
 		}
 	}
+	return false
+}
+
+func (h *ServerHandler) isTestApp(appName string, testAppNames []string) bool {
+	if len(testAppNames) == 0 {
+		return false
+	}
+
+	for _, testAppName := range testAppNames {
+		if appName == testAppName {
+			return true
+		}
+	}
+
 	return false
 }
 
