@@ -2,6 +2,7 @@ package controller
 
 import (
 	"agent/agent"
+	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/json"
@@ -34,16 +35,28 @@ type App struct {
 	app       *Application
 }
 
+type AppMetric struct {
+	AppConfig
+	Metric string
+}
+
 type Controller struct {
 	baseInfo      *agent.BaseInfo
 	args          *ConrollerArgs
 	appConfigs    []*AppConfig
 	appConfigsMD5 string
 	apps          map[string]*App
+	metricCh      chan AppMetric
+	appMetrics    map[string]string
 }
 
 func New(args *ConrollerArgs) (*Controller, error) {
-	// new apps
+	appsDir := path.Join(args.WorkingDir, args.RelAppsDir)
+	err := os.MkdirAll(appsDir, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+
 	controllerInfo := agent.ControllerInfo{
 		WorkingDir:      args.WorkingDir,
 		Version:         Version,
@@ -53,14 +66,13 @@ func New(args *ConrollerArgs) (*Controller, error) {
 	}
 	info := agent.NewBaseInfo(nil, &agent.AppInfo{ControllerInfo: controllerInfo})
 
-	c := &Controller{apps: make(map[string]*App), args: args, baseInfo: info}
-
-	appsDir := path.Join(args.WorkingDir, args.RelAppsDir)
-	err := os.MkdirAll(appsDir, os.ModePerm)
-	if err != nil {
-		return nil, err
+	c := &Controller{
+		apps:       make(map[string]*App),
+		args:       args,
+		baseInfo:   info,
+		appMetrics: make(map[string]string),
+		metricCh:   make(chan AppMetric, 64),
 	}
-
 	return c, nil
 }
 
@@ -68,6 +80,8 @@ func (c *Controller) Run(ctx context.Context) error {
 	c.loadLocal()
 	c.updateAppsFromServer()
 	c.newApps()
+
+	go c.handleMetric(ctx)
 
 	scriptUpdateinterval := time.Second * time.Duration(c.args.ScriptUpdateInvterval)
 	ticker := time.NewTicker(scriptUpdateinterval)
@@ -77,12 +91,14 @@ func (c *Controller) Run(ctx context.Context) error {
 		case <-ticker.C:
 			elapsed := time.Since(appUpdateTime)
 			if elapsed > scriptUpdateinterval {
-				err := c.updateAppsFromServer()
-				if err == nil {
-					c.renewApps()
-					log.Infof("Controller.Run updateAppsFromServer renew apps")
-				} else {
+				isUpdate, err := c.updateAppsFromServer()
+				if err != nil {
 					log.Infof("Controller.Run updateAppsFromServer %s", err.Error())
+				} else if isUpdate {
+					log.Infof("Controller.Run updateAppsFromServer renew apps")
+					c.renewApps()
+				} else {
+					log.Infof("Controller.Run updateAppsFromServer no apps change")
 				}
 				appUpdateTime = time.Now()
 			}
@@ -93,6 +109,72 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	}
 
+}
+
+func (c *Controller) handleMetric(ctx context.Context) {
+	for {
+		ticker := time.NewTicker(60 * time.Second)
+		select {
+		case <-ticker.C:
+			// send metric to server
+			metrics := make(map[string]string)
+			for appName, metric := range c.appMetrics {
+				metrics[appName] = metric
+			}
+			go c.pushMetrics(metrics)
+
+		case metric := <-c.metricCh:
+			c.appMetrics[metric.AppName] = metric.Metric
+
+		case <-ctx.Done():
+			log.Info("handleMetric exist")
+			return
+		}
+	}
+}
+
+func (c *Controller) pushMetrics(metrics map[string]string) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	appMetrics := make([]*AppMetric, 0, len(c.apps))
+	for _, app := range c.apps {
+		metric := metrics[app.appConfig.AppName]
+		appMetrics = append(appMetrics, &AppMetric{AppConfig: *app.appConfig, Metric: metric})
+	}
+
+	buf, err := json.Marshal(appMetrics)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s%s?uuid=%s", c.args.ServerURL, "/push/metrics", c.baseInfo.UUID())
+
+	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, bytes.NewReader(buf))
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("getScriptInfoFromServer status code: %d, msg: %s, url: %s", resp.StatusCode, string(body), url)
+	}
+
+	return nil
+}
+
+func (c *Controller) pushMetric(metric AppMetric) {
+	c.metricCh <- metric
 }
 
 func (c *Controller) loadLocal() {
@@ -122,7 +204,7 @@ func (c *Controller) newApps() {
 	}
 
 	for _, appConfig := range c.appConfigs {
-		app, err := NewApplication(&AppArguments{ControllerArgs: c.args, AppConfig: appConfig})
+		app, err := NewApplication(&AppArguments{ControllerArgs: c.args, AppConfig: appConfig}, c)
 		if err != nil {
 			log.Errorf("Controller.newApps NewApplication failed:%s", err.Error())
 			continue
@@ -167,7 +249,7 @@ func (c *Controller) renewApps() {
 	for _, appConfig := range c.appConfigs {
 		_, ok := c.apps[appConfig.AppName]
 		if !ok {
-			app, err := NewApplication(&AppArguments{ControllerArgs: c.args, AppConfig: appConfig})
+			app, err := NewApplication(&AppArguments{ControllerArgs: c.args, AppConfig: appConfig}, c)
 			if err != nil {
 				log.Errorf("Controller.newApps NewApplication failed:%s", err.Error())
 				continue
@@ -197,11 +279,11 @@ func (c *Controller) loadLocalAppConfigs() ([]*AppConfig, error) {
 }
 
 // updateAppsFromServer just get apps from server and save on local
-func (c *Controller) updateAppsFromServer() error {
+func (c *Controller) updateAppsFromServer() (bool, error) {
 	// load config from server
 	appConfigs, err := c.getAppConfigsFromServer()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// Filtering invalid configurations
@@ -216,8 +298,8 @@ func (c *Controller) updateAppsFromServer() error {
 
 	}
 
-	if !c.isAppsChange(newAppConfigs) {
-		return fmt.Errorf("apps config no change")
+	if !c.isAppsConfigChange(newAppConfigs) {
+		return false, nil
 	}
 
 	for _, appConfig := range newAppConfigs {
@@ -252,16 +334,16 @@ func (c *Controller) updateAppsFromServer() error {
 
 	if err = c.saveAppConfigs(newAppConfigs); err != nil {
 		log.Errorf("Controller.updateAppConfigAndScriptFromServer saveAppConfigs faile %v", err.Error())
-		return err
+		return false, err
 	}
 
 	c.appConfigsMD5 = c.configMD5(newAppConfigs)
 	c.appConfigs = newAppConfigs
 
-	return nil
+	return true, nil
 }
 
-func (c *Controller) isAppsChange(newAppConfigs []*AppConfig) bool {
+func (c *Controller) isAppsConfigChange(newAppConfigs []*AppConfig) bool {
 	if len(c.apps) != len(newAppConfigs) {
 		return true
 	}
@@ -305,7 +387,7 @@ func (c *Controller) isAppConfigChange(appConfig1 *AppConfig, appConfig2 *AppCon
 func (c *Controller) getAppConfigsFromServer() ([]*AppConfig, error) {
 	queryString := c.baseInfo.ToURLQuery()
 
-	url := fmt.Sprintf("%s?%s", c.args.ServerURL, queryString.Encode())
+	url := fmt.Sprintf("%s%s?%s", c.args.ServerURL, "/config/apps", queryString.Encode())
 
 	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
 	defer cancel()
@@ -417,7 +499,7 @@ func (c *Controller) removeAppDir(appConfig *AppConfig) error {
 func (c *Controller) onStop() {
 	c.stopAllApps()
 
-	log.Infof("Controller.onStop")
+	log.Infof("Controller.onStop abc")
 }
 
 func (c *Controller) stopAllApps() {

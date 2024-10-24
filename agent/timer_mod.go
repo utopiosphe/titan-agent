@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -63,16 +64,24 @@ func (tm *TimerModule) createTimerStub(L *lua.LState) int {
 	log.Infof("createTimerStub tag:%s, interval:%d, callback:%s", tag, interval, callback)
 
 	if !tm.owner.hasLuaFunction(callback) {
-		return 0
+		L.Push(lua.LString(fmt.Sprintf("callback function %s not exist", callback)))
+		return 1
 	}
 
 	if len(tag) < 1 {
-		return 0
+		L.Push(lua.LString("tag can not empty"))
+		return 1
+	}
+
+	if interval <= 0 {
+		L.Push(lua.LString("interval can not <= 0"))
+		return 1
 	}
 
 	_, exist := tm.timerMap[tag]
 	if exist {
-		return 0
+		L.Push(lua.LString(fmt.Sprintf("timer %s already exist", tag)))
+		return 1
 	}
 
 	ctx, ctxCancelFn := context.WithCancel(context.Background())

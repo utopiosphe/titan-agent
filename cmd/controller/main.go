@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -19,6 +21,48 @@ var versionCmd = &cli.Command{
 	},
 	Action: func(cctx *cli.Context) error {
 		fmt.Println(controller.Version)
+		return nil
+	},
+}
+
+var testCmd = &cli.Command{
+	Name: "test",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:     "path",
+			Usage:    "--path=/path/to/luafile",
+			Required: true,
+			Value:    "",
+		},
+		&cli.IntFlag{
+			Name:  "time",
+			Usage: "--time 60",
+			Value: 60,
+		},
+	},
+	Before: func(cctx *cli.Context) error {
+		return nil
+	},
+
+	Action: func(cctx *cli.Context) error {
+		luaPath := cctx.String("path")
+		controllerArgs := &controller.ConrollerArgs{WorkingDir: filepath.Dir(luaPath), RelAppsDir: ""}
+		appConfig := &controller.AppConfig{AppName: "test", AppDir: "", ScriptName: filepath.Base(luaPath)}
+
+		args := &controller.AppArguments{ControllerArgs: controllerArgs, AppConfig: appConfig}
+		app, err := controller.NewApplication(args, nil)
+		if err != nil {
+			return err
+		}
+
+		t := cctx.Int("time")
+
+		go func() {
+			time.Sleep(time.Duration(t) * time.Second)
+			app.Stop()
+		}()
+
+		app.Run()
 		return nil
 	},
 }
@@ -118,6 +162,7 @@ func main() {
 	commands := []*cli.Command{
 		runCmd,
 		versionCmd,
+		testCmd,
 	}
 
 	app := &cli.App{

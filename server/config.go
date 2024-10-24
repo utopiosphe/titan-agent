@@ -6,15 +6,15 @@ import (
 )
 
 type Config struct {
-	LuaFileList        []*File              `json:"luaList"`
-	ControllerFileList []*File              `json:"controllerList"`
-	AppFileList        []*App               `json:"appList"`
+	LuaFileList        []*FileConfig        `json:"luaList"`
+	ControllerFileList []*FileConfig        `json:"controllerList"`
+	AppList            []*AppConfig         `json:"appList"`
 	Resources          map[string]*Resource `json:"resources"`
 	NodeTags           map[string][]string  `json:"nodeTags"`
 	TestNodes          map[string]*TestApp  `json:"testNodes"`
 }
 
-type File struct {
+type FileConfig struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 	MD5     string `json:"md5"`
@@ -23,7 +23,7 @@ type File struct {
 	Tag     string `json:"tag"`
 }
 
-type App struct {
+type AppConfig struct {
 	AppName string `json:"name"`
 	// relative app dir
 	AppDir       string   `json:"appDir"`

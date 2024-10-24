@@ -28,9 +28,11 @@ type Application struct {
 	ctx       context.Context
 	ctxCancel context.CancelFunc
 	stopCh    chan bool
+
+	controller *Controller
 }
 
-func NewApplication(args *AppArguments) (*Application, error) {
+func NewApplication(args *AppArguments, controller *Controller) (*Application, error) {
 	controllerInfo := agent.ControllerInfo{
 		WorkingDir:      args.ControllerArgs.WorkingDir,
 		Version:         Version,
@@ -46,11 +48,12 @@ func NewApplication(args *AppArguments) (*Application, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	app := &Application{
-		baseInfo:  info,
-		args:      args,
-		stopCh:    make(chan bool),
-		ctx:       ctx,
-		ctxCancel: cancel,
+		baseInfo:   info,
+		args:       args,
+		stopCh:     make(chan bool),
+		ctx:        ctx,
+		ctxCancel:  cancel,
+		controller: controller,
 	}
 
 	if err := app.loadScript(); err != nil {
@@ -77,6 +80,13 @@ func (app *Application) Run() error {
 		select {
 		case ev := <-script.Events():
 			script.HandleEvent(ev)
+		case metric := <-script.Metric():
+			log.Info("metric:", metric)
+			appMetric := AppMetric{
+				AppConfig: AppConfig{AppName: app.args.AppConfig.AppName},
+				Metric:    metric,
+			}
+			app.controller.pushMetric(appMetric)
 		case <-app.ctx.Done():
 			script.Stop()
 			loop = false

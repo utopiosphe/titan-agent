@@ -5,14 +5,13 @@ function mod.start()
 
     mod.timerInterval = 60
     mod.processName = "controller"
-    mod.serverURL = "http://agent.titannet.io/update/controller"
-    mod.appsRequestURL = "http://agent.titannet.io/update/apps"
+    mod.serverURL = "http://agent.titannet.io"
+    mod.controllerConfigURLPath = "/config/controller"
     mod.downloadPackageName = "controller.zip"
     mod.extraControllerDir = "controller-extra"
     mod.isUpdate = false
     -- init base info
     mod.getBaseInfo()
-
 
     if mod.info.os == "windows" then
         mod.processName = "controller.exe"
@@ -38,6 +37,10 @@ end
 
 function mod.stop()
     mod.stopBusinessJob()
+
+    if mod.logFile then
+        mod.logFile:close()
+    end
 end
 
 function mod.getBaseInfo()
@@ -156,7 +159,7 @@ function mod.startBusinessJob()
     local logFilePath = mod.process.dir.."/log"
     local filePath = mod.process.filePath
 
-    local cmdString = filePath.." run --working-dir "..mod.info.workingDir.." --server-url "..mod.appsRequestURL
+    local cmdString = filePath.." run --working-dir "..mod.info.workingDir.." --server-url "..mod.serverURL
     cmdString = cmdString.." --uuid "..mod.info.uuid.." --script-interval 60".." --log-file "..logFilePath
     
     mod.print("cmdString "..cmdString)
@@ -283,7 +286,7 @@ function mod.onTimerUpdate()
 end
 
 function mod.updateFromServer(callback)
-    local result, err = mod.getUpdateConfig()
+    local result, err = mod.getControllerUpdateConfig()
     if err then
         mod.print("mod.updateFromServer get controller update config from server "..err)
         callback(false)
@@ -300,7 +303,7 @@ function mod.updateFromServer(callback)
 
     local filePath = mod.info.workingDir.."/"..mod.downloadPackageName
     local dmod = require 'downloader'
-    local err = dmod.createDownloader("update", filePath, result.url, 'onDownloadCallback', 20)
+    local err = dmod.createDownloader("update", filePath, result.url, 'onDownloadCallback', 300)
     if err then
         mod.print("create downloader failed "..err)
         callback(false)
@@ -310,11 +313,11 @@ function mod.updateFromServer(callback)
     callback(true)
 end
 
-function mod.getUpdateConfig() 
+function mod.getControllerUpdateConfig() 
     local http = require("http")
     local client = http.client({timeout= 10})
 
-    local url = mod.serverURL.."?version="..mod.info.version.."&os="..mod.info.os.."&uuid="..mod.info.uuid
+    local url = mod.serverURL..mod.controllerConfigURLPath.."?version="..mod.info.version.."&os="..mod.info.os.."&uuid="..mod.info.uuid
     local request = http.request("GET", url)
     local result, err = client:do_request(request)
     if err then
@@ -442,6 +445,28 @@ function mod.updateProcess(downloadResult)
     end
 end
 
+function mod.urlencode(str)
+    if (str) then
+        str = string.gsub(str, "([^%w%.%- ])", function(c)
+            return string.format("%%%02X", string.byte(c))
+        end)
+        str = string.gsub(str, " ", "+")
+    end
+    return str
+end
+
+function mod.tableToQueryString(tbl)
+    local queryString = {}
+
+    for k, v in pairs(tbl) do
+        local encodedKey = mod.urlencode(tostring(k))
+        local encodedValue = mod.urlencode(tostring(v))
+        table.insert(queryString, encodedKey .. "=" .. encodedValue)
+    end
+
+    return table.concat(queryString, "&")
+end
+
 function mod.print(msg)
     local logLeve = "info"
     if type(msg) == "table" then
@@ -452,7 +477,7 @@ function mod.print(msg)
         msg = string.format("%s %s", tableMsg,"}")
          
     end
-    
+
     print(string.format('time="%s" leve=%s lua=%s msg="%s"', os.date("%Y-%m-%dT%H:%M:%S"), logLeve, mod.luaScriptName, msg))
 end
 

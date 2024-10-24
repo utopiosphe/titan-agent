@@ -8,12 +8,15 @@ function mod.start()
     mod.supplierID = "106465"
     mod.downloadURL = "http://agent.titannet.io/titan-l3-arm32"
     mod.titanLocatorURL = "https://cassini-locator.titannet.io:5000/rpc/v0"
-    -- mod.md5URL = "https://iaas.ppfs.io/airship/airship-agent-android-arm-latest.md5"
+    mod.md5URL = "http://agent.titannet.io/titan-l3-arm32.md5"
 
     mod.getBaseInfo()
     
-    if not mod.isTitanL3Exist() then
-        mod.installTitanL3()
+    if mod.isTitanL3NotInstalled() then
+        mod.isInstalling = true
+        mod.downloadTitanL3()
+        mod.startTimer()
+        return
     end
 
     if not mod.isTitanL3Start() then
@@ -28,33 +31,68 @@ function mod.stop()
     mod.print("mod.stop")
 end
 
+function mod.downloadTitanL3()
+    local dmod = require("downloader")
 
-function mod.isTitanL3Exist()
+    local appPath = mod.info.appDir .."/"..mod.appName
+    local err = dmod.createDownloader("download", appPath, mod.downloadURL, 'onDownloadCallback', 600)
+    if err then
+        mod.print("create downloader failed "..err)
+        mod.isInstalling = false
+        return
+    end
+
+    print("downloading file ".. mod.downloadURL..", to path:"..appPath)
+end
+
+function mod.onDownloadCallback(result)
+    mod.print("mod.onDownloadCallback")
+    mod.print(result)
+
+    if not result then
+        mod.isInstalling = false
+        mod.print("result == nil")
+        return
+    end
+
+    if result.err ~= "" then
+        mod.isInstalling = false
+        mod.print(result.err)
+        return
+    end
+
+    local strings = require("strings")
+    local md5 = mod.fetchTitanL3AppMd5(mod.md5URL)
+    if not strings.contains(md5, result.md5) then
+        mod.print("download file md5 not match")
+        mod.isInstalling = false
+        return
+    end
+    
+    local agmod = require("agent")
+    local err = agmod.chmod(result.filePath, "0755")
+    if err then
+        mod.print("chmod failed "..err)
+        mod.isInstalling = false
+        return
+    end
+
+    if not mod.isTitanL3Start() then
+        mod.startTitanL3()
+    end 
+
+    mod.isInstalling = false
+    
+end
+
+function mod.isTitanL3NotInstalled()
     local appPath = mod.info.appDir .."/"..mod.appName
     local goos = require("goos")
     local stat, err = goos.stat(appPath)
     if err then
-        return false
+        return true
     end
-    return true
-end
-
-function mod.installTitanL3()
-    local agmod = require("agent")
-    local strings = require("strings")
-
-    local appPath = mod.info.appDir .."/"..mod.appName
-    local err = mod.fetchTitanL3App(mod.downloadURL, appPath)
-    if err then
-        mod.print("fetchTitanL3App failed:"..err)
-        return
-    end
-
-    local err = agmod.chmod(appPath, "0755")
-    if err then
-        mod.print("chmod failed "..err)
-        return
-    end
+    return false
 end
 
 function mod.isTitanL3Start()
@@ -76,7 +114,8 @@ function mod.isTitanL3Start()
 end
 
 function mod.startTitanL3()
-    if not mod.isTitanL3Exist() then
+    if mod.isTitanL3NotInstalled() then
+        mod.print("titanL3 not install, can not start")
         return
     end
 
@@ -87,8 +126,8 @@ function mod.startTitanL3()
     local command = "nohup "..appPath.." --edge-repo "..repoPath.." daemon start --init --url "..mod.titanLocatorURL.." > "..logPath.." 2>&1 &"
     mod.print("command:"..command)
 
-    local cmd = require("cmd")
-    local result, err = cmd.exec(command)
+    local agmod = require("agent")
+    local result, err = agmod.runBashCmd(command)
     if err then
         mod.print(err)
         return
@@ -101,45 +140,22 @@ function mod.startTitanL3()
     mod.print("start "..appPath)
 end
 
-function mod.fetchTitanL3App(url, filePath) 
+function mod.fetchTitanL3AppMd5(url) 
     local http = require("http")
-    local client = http.client({timeout=60})
+    local client = http.client({timeout=30})
 
     local request = http.request("GET", url)
     local result, err = client:do_request(request)
     if err then
-        return err
+        return nil, err
     end
 
     if not (result.code == 200) then
-        return "status code "..result.code..", url:"..url
+        return nil, "status code "..result.code..", url:"..url
     end
 
-    local ioutil = require("ioutil")
-    local err = ioutil.write_file(filePath, result.body)
-    if err then 
-        return err
-    end
-
-    return nil
+    return result.body, nil
 end
-
--- function mod.fetchAirshipAppMd5(url) 
---     local http = require("http")
---     local client = http.client({timeout=300})
-
---     local request = http.request("GET", url)
---     local result, err = client:do_request(request)
---     if err then
---         return nil, err
---     end
-
---     if not (result.code == 200) then
---         return nil, "status code "..result.code..", url:"..url
---     end
-
---     return result.body, nil
--- end
 
 function mod.startTimer()
     local tmod = require("timer")
@@ -147,7 +163,7 @@ function mod.startTimer()
 end
 
 function mod.onTimerMonitor()
-    mod.print("mod.onTimerMonitor android-airship.lua")
+    mod.print("mod.onTimerMonitor")
     if mod.monitorLastActivitTime then
         if os.difftime(os.time(), mod.monitorLastActivitTime) < mod.timerInterval then
             mod.print("insufficient time to monitor")
@@ -156,9 +172,15 @@ function mod.onTimerMonitor()
     end
     mod.monitorLastActivitTime = os.time()
 
+    if mod.isInstalling then
+        mod.print("isInstalling")
+        return
+    end
     
-    if not mod.isTitanL3Exist() then
-        mod.installTitanL3()
+    if mod.isTitanL3NotInstalled() then
+        mod.isInstalling = true
+        mod.downloadTitanL3()
+        return
     end
 
     if not mod.isTitanL3Start() then

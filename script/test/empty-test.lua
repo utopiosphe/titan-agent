@@ -1,21 +1,34 @@
 local mod = {luaScriptName="empty-test.lua"}
 
 function mod.start()
-    mod.print("mod.start test.lua")
+    mod.print("mod.start")
+
+    mod.timerInterval = 60
     mod.getBaseInfo()
+    mod.startTimer()
 end
 
 
 function mod.stop()
-    mod.print("mod.stop test.lua")
+    mod.print("mod.stop")
 end
+
+function mod.startTimer()
+    local tmod = require("timer")
+    tmod.createTimer('monitor', mod.timerInterval, 'onTimerMonitor')
+end
+
+function mod.onTimerMonitor()
+    mod.print("mod.onTimerMonitor")
+end
+
 
 function mod.getBaseInfo()
     local agent = require 'agent'
     local info = agent.info()
     if info then
         mod.info = info
-        mod.print("test.lua baseInfo:")
+        mod.print("baseInfo:")
         mod.print(info)
     end
 end

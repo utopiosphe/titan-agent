@@ -2,6 +2,8 @@ package agent
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"os/exec"
@@ -140,7 +142,6 @@ func (baseInfo *BaseInfo) getAndroidID() {
 	}
 
 	baseInfo.androidID = androidID
-
 }
 
 func (baseInfo *BaseInfo) getUUID() {
@@ -155,14 +156,30 @@ func (baseInfo *BaseInfo) getUUID() {
 		return
 	}
 
-	// get androi,linux,darwin uuid
-	uuid, err := runCmd("cat /proc/sys/kernel/random/uuid")
-	if err != nil {
-		fmt.Println("getUUID failed:", err.Error())
+	if runtime.GOOS == "linux" {
+		// get androi,linux,darwin uuid
+		machineID, err := runCmd("cat /etc/machine-id")
+		if err == nil {
+			baseInfo.uuid = formatToUUID(machineID)
+		} else {
+			fmt.Println("getUUID failed:", err.Error())
+		}
+
 		return
 	}
 
-	baseInfo.uuid = uuid
+	if runtime.GOOS == "android" {
+		androidID, err := runCmd("settings get secure android_id")
+		if err == nil {
+			baseInfo.uuid = generateUUIDFromString(androidID)
+		} else {
+			fmt.Println("getUUID failed:", err.Error())
+		}
+		return
+	}
+
+	// TODO add darwin
+
 }
 
 func (baseInfo *BaseInfo) getAndroidSerialNumber() {
@@ -193,6 +210,20 @@ func getWindowsUUID() (string, error) {
 	}
 
 	return "", fmt.Errorf("UUID not found")
+}
+
+func formatToUUID(id string) string {
+	if len(id) <= 20 {
+		return id
+	}
+
+	return fmt.Sprintf("%s-%s-%s-%s-%s", id[0:8], id[8:12], id[12:16], id[16:20], id[20:])
+}
+
+func generateUUIDFromString(s string) string {
+	hash := sha256.Sum256([]byte(s))
+	hashHex := hex.EncodeToString(hash[:])
+	return fmt.Sprintf("%s-%s-%s-%s-%s", hashHex[0:8], hashHex[8:12], hashHex[12:16], hashHex[16:20], hashHex[20:32])
 }
 
 func runCmd(command string) (string, error) {
@@ -335,4 +366,8 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 		t.RawSet(lua.LString("appDir"), lua.LString(baseInfo.appInfo.AppDir))
 	}
 	return t
+}
+
+func (baseInfo *BaseInfo) UUID() string {
+	return baseInfo.uuid
 }

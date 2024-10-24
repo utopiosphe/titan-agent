@@ -60,7 +60,7 @@ var runCmd = &cli.Command{
 		}
 
 		_ = config
-		mux := server.NewCustomServerMux(config)
+		mux := server.NewServerMux(config)
 
 		http.Handle("/", http.FileServer(http.Dir(fileServerDir)))
 

@@ -37,6 +37,8 @@ type Device struct {
 	Controller *Controller
 
 	IP string
+
+	AppList []*App
 }
 
 func NewDeviceFromURLQuery(values url.Values) *Device {

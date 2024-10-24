@@ -12,7 +12,8 @@ const (
 )
 
 type DevMgr struct {
-	devices sync.Map
+	agents      sync.Map
+	controllers sync.Map
 }
 
 func newDevMgr(ctx context.Context) *DevMgr {
@@ -37,39 +38,52 @@ func (dm *DevMgr) startTicker(ctx context.Context) {
 }
 
 func (dm *DevMgr) keepalive() {
-	offlineDevices := make([]*Device, 0)
-	dm.devices.Range(func(key, value any) bool {
+	offlineAgents := make([]*Device, 0)
+	dm.agents.Range(func(key, value any) bool {
 		d := value.(*Device)
 		if d != nil && time.Since(d.LastActivityTime) > offlineTime {
-			offlineDevices = append(offlineDevices, d)
+			offlineAgents = append(offlineAgents, d)
 		}
 		return true
 	})
 
-	for _, d := range offlineDevices {
-		dm.removeDevice(d)
+	for _, d := range offlineAgents {
+		dm.removeAgent(d)
+	}
+
+	offlineControllers := make([]*Device, 0)
+	dm.controllers.Range(func(key, value any) bool {
+		d := value.(*Device)
+		if d != nil && time.Since(d.LastActivityTime) > offlineTime {
+			offlineControllers = append(offlineControllers, d)
+		}
+		return true
+	})
+
+	for _, controller := range offlineControllers {
+		dm.removeAgent(controller)
 	}
 }
 
-func (dm *DevMgr) addDevice(device *Device) {
-	dm.devices.Store(device.UUID, device)
+func (dm *DevMgr) addAgent(device *Device) {
+	dm.agents.Store(device.UUID, device)
 }
 
-func (dm *DevMgr) removeDevice(device *Device) {
-	dm.devices.Delete(device.UUID)
+func (dm *DevMgr) removeAgent(device *Device) {
+	dm.agents.Delete(device.UUID)
 }
 
-func (dm *DevMgr) getDevice(uuid string) *Device {
-	v, ok := dm.devices.Load(uuid)
+func (dm *DevMgr) getAgent(uuid string) *Device {
+	v, ok := dm.agents.Load(uuid)
 	if !ok {
 		return nil
 	}
 	return v.(*Device)
 }
 
-func (dm *DevMgr) getAll() []*Device {
+func (dm *DevMgr) getAgents() []*Device {
 	devices := make([]*Device, 0)
-	dm.devices.Range(func(key, value any) bool {
+	dm.agents.Range(func(key, value any) bool {
 		d := value.(*Device)
 		if d != nil {
 			devices = append(devices, d)
@@ -80,14 +94,57 @@ func (dm *DevMgr) getAll() []*Device {
 	return devices
 }
 
-func (dm *DevMgr) updateDevice(d *Device) {
+func (dm *DevMgr) updateAgent(d *Device) {
 	if len(d.UUID) == 0 {
 		return
 	}
 
-	device := dm.getDevice(d.UUID)
+	device := dm.getAgent(d.UUID)
 	if device == nil {
-		dm.addDevice(d)
+		dm.addAgent(d)
+		return
+	}
+
+	device.LastActivityTime = d.LastActivityTime
+}
+
+func (dm *DevMgr) addController(device *Device) {
+	dm.controllers.Store(device.UUID, device)
+}
+
+func (dm *DevMgr) removeController(device *Device) {
+	dm.controllers.Delete(device.UUID)
+}
+
+func (dm *DevMgr) getController(uuid string) *Device {
+	v, ok := dm.controllers.Load(uuid)
+	if !ok {
+		return nil
+	}
+	return v.(*Device)
+}
+
+func (dm *DevMgr) getControllers() []*Device {
+	devices := make([]*Device, 0)
+	dm.controllers.Range(func(key, value any) bool {
+		d := value.(*Device)
+		if d != nil {
+			devices = append(devices, d)
+		}
+		return true
+	})
+
+	return devices
+}
+
+func (dm *DevMgr) updateController(d *Device) {
+	if len(d.UUID) == 0 {
+		return
+	}
+
+	device := dm.getController(d.UUID)
+	if device == nil {
+		dm.addController(d)
 		return
 	}
 

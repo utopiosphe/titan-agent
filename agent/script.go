@@ -25,6 +25,8 @@ type Script struct {
 	downloadModule *DownloadModule
 
 	processModule *ProcessModule
+
+	metricModule *MetricModule
 }
 
 func (s *Script) Events() <-chan ScriptEvent {
@@ -33,6 +35,14 @@ func (s *Script) Events() <-chan ScriptEvent {
 
 func (s *Script) pushEvt(evt ScriptEvent) {
 	s.eventsChan <- evt
+}
+
+func (s *Script) Metric() <-chan string {
+	if s.metricModule != nil {
+		return s.metricModule.metric()
+	}
+
+	return nil
 }
 
 func (s *Script) HandleEvent(evt ScriptEvent) {
@@ -88,6 +98,9 @@ func (s *Script) Start() {
 
 	s.processModule = newProcessModule(s)
 	ls.PreloadModule("process", s.processModule.loader)
+
+	s.metricModule = newMetricModule()
+	ls.PreloadModule("metric", s.metricModule.loader)
 
 	ls.PreloadModule("agent", newAgentModule(s.baseInfo.ToLuaTable(ls)).loader)
 
