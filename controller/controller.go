@@ -17,17 +17,18 @@ import (
 )
 
 const (
-	Version     = "0.1.1"
-	httpTimeout = 10 * time.Second
+	Version             = "0.1.1"
+	httpTimeout         = 10 * time.Second
+	pushMetricsInterval = 120 * time.Second
 )
 
 type ConrollerArgs struct {
-	WorkingDir            string
-	ScriptUpdateInvterval int
-	ServerURL             string
-	RelAppsDir            string
-	AppConfigsFileName    string
-	UUID                  string
+	WorkingDir           string
+	ScriptUpdateInterval int
+	ServerURL            string
+	RelAppsDir           string
+	AppConfigsFileName   string
+	Channel              string
 }
 
 type App struct {
@@ -37,7 +38,7 @@ type App struct {
 
 type AppMetric struct {
 	AppConfig
-	Metric string
+	Metric string `json:"metric"`
 }
 
 type Controller struct {
@@ -61,9 +62,10 @@ func New(args *ConrollerArgs) (*Controller, error) {
 		WorkingDir:      args.WorkingDir,
 		Version:         Version,
 		ServerURL:       args.ServerURL,
-		ScriptInvterval: args.ScriptUpdateInvterval,
-		UUID:            args.UUID,
+		ScriptInvterval: args.ScriptUpdateInterval,
+		Channel:         args.Channel,
 	}
+
 	info := agent.NewBaseInfo(nil, &agent.AppInfo{ControllerInfo: controllerInfo})
 
 	c := &Controller{
@@ -83,8 +85,10 @@ func (c *Controller) Run(ctx context.Context) error {
 
 	go c.handleMetric(ctx)
 
-	scriptUpdateinterval := time.Second * time.Duration(c.args.ScriptUpdateInvterval)
+	scriptUpdateinterval := time.Second * time.Duration(c.args.ScriptUpdateInterval)
 	ticker := time.NewTicker(scriptUpdateinterval)
+	defer ticker.Stop()
+
 	appUpdateTime := time.Now()
 	for {
 		select {
@@ -112,8 +116,10 @@ func (c *Controller) Run(ctx context.Context) error {
 }
 
 func (c *Controller) handleMetric(ctx context.Context) {
+	ticker := time.NewTicker(pushMetricsInterval)
+	defer ticker.Stop()
+
 	for {
-		ticker := time.NewTicker(60 * time.Second)
 		select {
 		case <-ticker.C:
 			// send metric to server
@@ -121,7 +127,12 @@ func (c *Controller) handleMetric(ctx context.Context) {
 			for appName, metric := range c.appMetrics {
 				metrics[appName] = metric
 			}
-			go c.pushMetrics(metrics)
+
+			go func() {
+				if err := c.pushMetrics(metrics); err != nil {
+					log.Error("handleMetric pushMetrics failed:", err.Error())
+				}
+			}()
 
 		case metric := <-c.metricCh:
 			c.appMetrics[metric.AppName] = metric.Metric
@@ -134,7 +145,10 @@ func (c *Controller) handleMetric(ctx context.Context) {
 }
 
 func (c *Controller) pushMetrics(metrics map[string]string) error {
-	if len(metrics) == 0 {
+	// if len(metrics) == 0 {
+	// 	return nil
+	// }
+	if len(c.apps) == 0 {
 		return nil
 	}
 
@@ -169,6 +183,8 @@ func (c *Controller) pushMetrics(metrics map[string]string) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("getScriptInfoFromServer status code: %d, msg: %s, url: %s", resp.StatusCode, string(body), url)
 	}
+
+	// log.Infof("push metrics")
 
 	return nil
 }
@@ -470,13 +486,13 @@ func (c *Controller) saveScript(content []byte, appConfig *AppConfig) error {
 }
 
 func (c *Controller) saveAppConfigs(appConfigs []*AppConfig) error {
-	appDir := path.Join(c.args.WorkingDir, c.args.RelAppsDir)
-	err := os.MkdirAll(appDir, os.ModePerm)
+	appsDir := path.Join(c.args.WorkingDir, c.args.RelAppsDir)
+	err := os.MkdirAll(appsDir, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	filePath := path.Join(appDir, c.args.AppConfigsFileName)
+	filePath := path.Join(appsDir, c.args.AppConfigsFileName)
 	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err

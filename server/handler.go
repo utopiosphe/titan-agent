@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -24,11 +23,11 @@ func (h *ServerHandler) handleGetLuaConfig(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *ServerHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("handleLuaUpdate, queryString %s\n", r.URL.RawQuery)
+	log.Debugf("handleLuaUpdate, queryString %s\n", r.URL.RawQuery)
 
 	d := NewDeviceFromURLQuery(r.URL.Query())
 	if d != nil {
-		d.IP, _, _ = net.SplitHostPort(r.RemoteAddr)
+		d.IP = getReadIP(r)
 		h.devMgr.updateAgent(d)
 	}
 
@@ -70,7 +69,7 @@ func (h *ServerHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ServerHandler) handleGetControllerConfig(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("handleControllerUpdate, queryString %s\n", r.URL.RawQuery)
+	log.Debugf("handleGetControllerConfig, queryString %s\n", r.URL.RawQuery)
 	// version := r.URL.Query().Get("version")
 	os := r.URL.Query().Get("os")
 	uuid := r.URL.Query().Get("uuid")
@@ -109,15 +108,16 @@ func (h *ServerHandler) handleGetControllerConfig(w http.ResponseWriter, r *http
 }
 
 func (h *ServerHandler) handleGetAppsConfig(w http.ResponseWriter, r *http.Request) {
-	log.Printf("handleAppsUpdate, queryString %s\n", r.URL.RawQuery)
+	log.Debugf("handleGetAppsConfig, queryString %s\n", r.URL.RawQuery)
 
 	d := NewDeviceFromURLQuery(r.URL.Query())
 	if d != nil {
-		d.IP, _, _ = net.SplitHostPort(r.RemoteAddr)
+		d.IP = getReadIP(r)
 		h.devMgr.updateController(d)
 	}
 
 	uuid := r.URL.Query().Get("uuid")
+	channel := r.URL.Query().Get("channel")
 
 	var testApps []string
 	testNode := h.config.TestNodes[uuid]
@@ -131,13 +131,19 @@ func (h *ServerHandler) handleGetAppsConfig(w http.ResponseWriter, r *http.Reque
 			if h.isTestApp(app.AppName, testApps) {
 				appList = append(appList, app)
 			}
+		} else if len(channel) > 0 {
+			// TODO handle channel
+			if h.isAppMatchChannel(app.AppName, channel) {
+				appList = append(appList, app)
+			}
+			// log.Infof("ServerHandler.handleGetAppsConfig channel %s", channel)
 		} else if h.isResourceMatchApp(r, app.ReqResources) {
 			appList = append(appList, app)
 		}
 	}
 
 	if len(appList) == 0 {
-		log.Printf("ServerHandler.handleAppsUpdate len(appList) == 0, uuid:%s, os:%s", r.URL.Query().Get("uuid"), r.URL.Query().Get("os"))
+		log.Infof("ServerHandler.handleGetAppsConfig len(appList) == 0, uuid:%s, os:%s", r.URL.Query().Get("uuid"), r.URL.Query().Get("os"))
 	}
 
 	buf, err := json.Marshal(appList)
@@ -178,18 +184,25 @@ func (h *ServerHandler) isTestApp(appName string, testAppNames []string) bool {
 	return false
 }
 
-func (h *ServerHandler) updateDeviceInfo(r *http.Request) {
-	uuid := r.URL.Query().Get("uuid")
-	device := h.devMgr.getAgent(uuid)
-	if device != nil {
-		version := r.URL.Query().Get("version")
-		device.Controller = &Controller{Version: version, LastActivityTime: time.Now()}
-	} else {
-		log.Errorf("ServerHandler.updateControllerInfo can not find device %s online", uuid)
+func (h *ServerHandler) isAppMatchChannel(appName string, channel string) bool {
+	apps := h.config.ChannelApps[channel]
+	if len(apps) == 0 {
+		return false
 	}
+
+	log.Info("isAppMatchChannel apps", apps, "current app", appName)
+	for _, app := range apps {
+		if appName == app {
+			return true
+		}
+	}
+
+	return false
 }
 
-func (h *ServerHandler) handleDeviceList(w http.ResponseWriter, r *http.Request) {
+func (h *ServerHandler) handleAgentList(w http.ResponseWriter, r *http.Request) {
+	log.Debugf("handleAgentList, queryString %s\n", r.URL.RawQuery)
+
 	devices := h.devMgr.getAgents()
 
 	result := struct {
@@ -211,6 +224,8 @@ func (h *ServerHandler) handleDeviceList(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *ServerHandler) handleControllerList(w http.ResponseWriter, r *http.Request) {
+	log.Debugf("handleControllerList, queryString %s\n", r.URL.RawQuery)
+
 	devices := h.devMgr.getControllers()
 
 	result := struct {
@@ -292,7 +307,7 @@ func (h *ServerHandler) handlePushMetrics(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	log.Infof("ServerHandler.handlePushMetrics ", string(b))
+	log.Info("ServerHandler.handlePushMetrics ", string(b))
 
 	apps := make([]*App, 0)
 	err = json.Unmarshal(b, &apps)
@@ -326,4 +341,12 @@ func getResource(r *http.Request) (os string, cpu int, memory int64, disk int64)
 	diskBytes := stringToInt64(diskStr)
 	disk = diskBytes / (1024 * 1024 * 1024)
 	return
+}
+
+func getReadIP(r *http.Request) string {
+	realIP := r.Header.Get("X-Real-IP")
+	if len(realIP) == 0 {
+		realIP, _, _ = net.SplitHostPort(r.RemoteAddr)
+	}
+	return realIP
 }

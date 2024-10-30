@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	version     = "0.1.0"
+	version     = "0.1.1"
 	httpTimeout = 10 * time.Second
 )
 
@@ -26,6 +26,7 @@ type AgentArguments struct {
 	ScriptInvterval int
 
 	ServerURL string
+	Channel   string
 }
 
 type Agent struct {
@@ -52,6 +53,7 @@ func New(args *AgentArguments) (*Agent, error) {
 		ServerURL:       args.ServerURL,
 		ScriptFileName:  args.ScriptFileName,
 		ScriptInvterval: args.ScriptInvterval,
+		Channel:         args.Channel,
 	}
 	agent := &Agent{
 		agentVersion: version,

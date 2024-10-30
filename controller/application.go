@@ -37,7 +37,8 @@ func NewApplication(args *AppArguments, controller *Controller) (*Application, e
 		WorkingDir:      args.ControllerArgs.WorkingDir,
 		Version:         Version,
 		ServerURL:       args.ControllerArgs.ServerURL,
-		ScriptInvterval: args.ControllerArgs.ScriptUpdateInvterval,
+		ScriptInvterval: args.ControllerArgs.ScriptUpdateInterval,
+		Channel:         args.ControllerArgs.Channel,
 	}
 	appInfo := &agent.AppInfo{
 		ControllerInfo: controllerInfo,

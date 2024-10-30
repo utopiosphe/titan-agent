@@ -25,7 +25,7 @@ func newDevMgr(ctx context.Context) *DevMgr {
 
 func (dm *DevMgr) startTicker(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop() // 确保在程序结束时停止 ticker
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -61,7 +61,7 @@ func (dm *DevMgr) keepalive() {
 	})
 
 	for _, controller := range offlineControllers {
-		dm.removeAgent(controller)
+		dm.removeController(controller)
 	}
 }
 
@@ -125,16 +125,16 @@ func (dm *DevMgr) getController(uuid string) *Device {
 }
 
 func (dm *DevMgr) getControllers() []*Device {
-	devices := make([]*Device, 0)
+	controllers := make([]*Device, 0)
 	dm.controllers.Range(func(key, value any) bool {
 		d := value.(*Device)
 		if d != nil {
-			devices = append(devices, d)
+			controllers = append(controllers, d)
 		}
 		return true
 	})
 
-	return devices
+	return controllers
 }
 
 func (dm *DevMgr) updateController(d *Device) {
@@ -142,11 +142,11 @@ func (dm *DevMgr) updateController(d *Device) {
 		return
 	}
 
-	device := dm.getController(d.UUID)
-	if device == nil {
+	controller := dm.getController(d.UUID)
+	if controller == nil {
 		dm.addController(d)
 		return
 	}
 
-	device.LastActivityTime = d.LastActivityTime
+	controller.LastActivityTime = d.LastActivityTime
 }

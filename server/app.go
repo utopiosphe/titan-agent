@@ -7,4 +7,5 @@ type App struct {
 	ScriptName string `json:"scriptName"`
 	ScriptMD5  string `json:"scriptMD5"`
 	ScriptURL  string `json:"scriptURL"`
+	Metric     string `json:"metric"`
 }

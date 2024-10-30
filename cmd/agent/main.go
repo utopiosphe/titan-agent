@@ -43,6 +43,11 @@ func main() {
 				Required: true,
 				Value:    "http://localhost:8080/update/lua",
 			},
+			&cli.StringFlag{
+				Name:  "channel",
+				Usage: "--channel titan-l1 or painet",
+				Value: "titan-l1",
+			},
 		},
 		Before: func(cctx *cli.Context) error {
 			return nil
@@ -54,6 +59,7 @@ func main() {
 
 				ScriptInvterval: cctx.Int("script-interval"),
 				ServerURL:       cctx.String("server-url"),
+				Channel:         cctx.String("channel"),
 			}
 
 			agent, err := agent.New(agrs)

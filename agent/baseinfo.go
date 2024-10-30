@@ -27,6 +27,7 @@ type AgentInfo struct {
 	ServerURL       string
 	ScriptFileName  string
 	ScriptInvterval int
+	Channel         string
 }
 
 // Used by controller
@@ -35,7 +36,7 @@ type ControllerInfo struct {
 	Version         string
 	ServerURL       string
 	ScriptInvterval int
-	UUID            string
+	Channel         string
 }
 
 type AppInfo struct {
@@ -117,17 +118,6 @@ func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 	baseInfo.getUUID()
 	baseInfo.getAndroidSerialNumber()
 	baseInfo.getDiskUsage()
-
-	if len(baseInfo.androidSerialNumber) != 0 || len(baseInfo.androidID) != 0 {
-		baseInfo.os = "android"
-	}
-
-	// /proc/sys/kernel/random/uuid is random id
-	// override uuid by agent uuid
-	if appInfo != nil && len(appInfo.UUID) > 0 {
-		baseInfo.uuid = appInfo.UUID
-	}
-
 	return baseInfo
 }
 
@@ -312,10 +302,14 @@ func (baseInfo *BaseInfo) ToURLQuery() url.Values {
 
 	if baseInfo.agentInfo != nil {
 		query.Add("version", baseInfo.agentInfo.Version)
+		query.Add("channel", baseInfo.agentInfo.Channel)
+		query.Add("workingDir", baseInfo.agentInfo.WorkingDir)
 	}
 
 	if baseInfo.appInfo != nil {
 		query.Add("version", baseInfo.appInfo.Version)
+		query.Add("channel", baseInfo.appInfo.Channel)
+		query.Add("workingDir", baseInfo.appInfo.WorkingDir)
 	}
 
 	return query
@@ -355,6 +349,7 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 		t.RawSet(lua.LString("serverURL"), lua.LString(baseInfo.agentInfo.ServerURL))
 		t.RawSet(lua.LString("scriptFileName"), lua.LString(baseInfo.agentInfo.ScriptFileName))
 		t.RawSet(lua.LString("scriptInvterval"), lua.LNumber(baseInfo.agentInfo.ScriptInvterval))
+		t.RawSet(lua.LString("channel"), lua.LString(baseInfo.agentInfo.Channel))
 	}
 
 	if baseInfo.appInfo != nil {
@@ -364,6 +359,7 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 		t.RawSet(lua.LString("scriptInvterval"), lua.LNumber(baseInfo.appInfo.ScriptInvterval))
 		t.RawSet(lua.LString("appRootDir"), lua.LString(baseInfo.appInfo.AppRootDir))
 		t.RawSet(lua.LString("appDir"), lua.LString(baseInfo.appInfo.AppDir))
+		t.RawSet(lua.LString("channel"), lua.LString(baseInfo.appInfo.Channel))
 	}
 	return t
 }

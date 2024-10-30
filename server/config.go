@@ -6,12 +6,17 @@ import (
 )
 
 type Config struct {
+	DefaultLuaScript  string
+	DefaultController map[string]string
+	DefaultApp        map[string]string
+
 	LuaFileList        []*FileConfig        `json:"luaList"`
 	ControllerFileList []*FileConfig        `json:"controllerList"`
 	AppList            []*AppConfig         `json:"appList"`
 	Resources          map[string]*Resource `json:"resources"`
 	NodeTags           map[string][]string  `json:"nodeTags"`
 	TestNodes          map[string]*TestApp  `json:"testNodes"`
+	ChannelApps        map[string][]string  `json:"channelApps"`
 }
 
 type FileConfig struct {

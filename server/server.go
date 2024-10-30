@@ -20,7 +20,7 @@ func NewServerMux(config *Config) *ServeMux {
 	mux.Handle("/config/controller", http.HandlerFunc(handler.handleGetControllerConfig))
 	mux.Handle("/config/apps", http.HandlerFunc(handler.handleGetAppsConfig))
 
-	mux.Handle("/device/list", http.HandlerFunc(handler.handleDeviceList))
+	mux.Handle("/agent/list", http.HandlerFunc(handler.handleAgentList))
 	mux.Handle("/controller/list", http.HandlerFunc(handler.handleControllerList))
 	mux.Handle("/app/list", http.HandlerFunc(handler.handleAppList))
 	mux.Handle("/app/info", http.HandlerFunc(handler.handleAppInfo))

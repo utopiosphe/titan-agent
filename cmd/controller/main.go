@@ -114,6 +114,10 @@ var runCmd = &cli.Command{
 			EnvVars: []string{"LOG_FILE"},
 			Value:   "",
 		},
+		&cli.StringFlag{
+			Name:  "channel",
+			Usage: "--channel titan or painet",
+		},
 	},
 	Before: func(cctx *cli.Context) error {
 		return nil
@@ -133,12 +137,12 @@ var runCmd = &cli.Command{
 		}
 
 		args := &controller.ConrollerArgs{
-			WorkingDir:            cctx.String("working-dir"),
-			ServerURL:             cctx.String("server-url"),
-			ScriptUpdateInvterval: cctx.Int("script-interval"),
-			AppConfigsFileName:    cctx.String("appconfigs-filename"),
-			RelAppsDir:            cctx.String("rel-apps-dir"),
-			UUID:                  cctx.String("uuid"),
+			WorkingDir:           cctx.String("working-dir"),
+			ServerURL:            cctx.String("server-url"),
+			ScriptUpdateInterval: cctx.Int("script-interval"),
+			AppConfigsFileName:   cctx.String("appconfigs-filename"),
+			RelAppsDir:           cctx.String("rel-apps-dir"),
+			Channel:              cctx.String("channel"),
 		}
 
 		ctr, err := controller.New(args)

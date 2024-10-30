@@ -24,13 +24,18 @@ type Device struct {
 
 	Macs string
 
-	CPUModuleName   string
-	CPUCores        int
-	CPUMhz          float64
+	CPUModuleName string
+	CPUCores      int
+	CPUMhz        float64
+
 	TotalMemory     int64
 	UsedMemory      int64
 	AvailableMemory int64
-	Baseboard       string
+
+	TotalDisk int64
+	FreeDisk  int64
+
+	Baseboard string
 
 	LastActivityTime time.Time
 
@@ -39,6 +44,9 @@ type Device struct {
 	IP string
 
 	AppList []*App
+
+	WorkingDir string
+	Channel    string
 }
 
 func NewDeviceFromURLQuery(values url.Values) *Device {
@@ -62,7 +70,13 @@ func NewDeviceFromURLQuery(values url.Values) *Device {
 	d.UsedMemory = stringToInt64(values.Get("usedMemory"))
 	d.AvailableMemory = stringToInt64(values.Get("availableMemory"))
 
+	d.TotalDisk = stringToInt64(values.Get("totalDisk"))
+	d.FreeDisk = stringToInt64(values.Get("freeDisk"))
+
 	d.Baseboard = values.Get("baseboard")
+
+	d.WorkingDir = values.Get("workingDir")
+	d.Channel = values.Get("channel")
 
 	return d
 }
