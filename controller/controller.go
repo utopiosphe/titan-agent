@@ -322,19 +322,19 @@ func (c *Controller) updateAppsFromServer() (bool, error) {
 		scriptContent, err := c.getScriptFromServer(appConfig.ScriptURL)
 		if err != nil {
 			log.Errorf("Controller.updateAppConfigAndScriptFromServer getScriptFromServer faile %v", err.Error())
-			continue
+			return false, err
 		}
 
 		newMD5 := fmt.Sprintf("%x", md5.Sum(scriptContent))
 		if newMD5 != appConfig.ScriptMD5 {
 			log.Errorf("Controller.updateAppConfigAndScriptFromServer script md5 not match")
-			continue
+			return false, err
 		}
 
 		err = c.saveScript(scriptContent, appConfig)
 		if err != nil {
 			log.Errorf("Controller.updateAppConfigAndScriptFromServer saveScript faile %v", err.Error())
-			continue
+			return false, err
 		}
 
 	}
@@ -344,6 +344,7 @@ func (c *Controller) updateAppsFromServer() (bool, error) {
 		if _, ok := appConfigMap[appConfig.AppName]; !ok {
 			if err = c.removeAppDir(appConfig); err != nil {
 				log.Errorf("Controller.updateAppConfigAndScriptFromServer removeAppDir %s", err.Error())
+				return false, err
 			}
 		}
 	}

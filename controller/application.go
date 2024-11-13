@@ -87,7 +87,10 @@ func (app *Application) Run() error {
 				AppConfig: AppConfig{AppName: app.args.AppConfig.AppName},
 				Metric:    metric,
 			}
-			app.controller.pushMetric(appMetric)
+			// for test
+			if app.controller != nil {
+				app.controller.pushMetric(appMetric)
+			}
 		case <-app.ctx.Done():
 			script.Stop()
 			loop = false

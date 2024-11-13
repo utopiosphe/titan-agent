@@ -135,6 +135,7 @@ function mod.startTitanL3()
 
     if result.status ~= 0 then
         mod.print("start "..appPath.." failed:"..result.stderr)
+        return
     end
 
     mod.print("start "..appPath)

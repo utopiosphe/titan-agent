@@ -3,6 +3,20 @@ local mod = {luaScriptName="android-test.lua"}
 function mod.start()
     mod.print("mod.start")
     mod.getBaseInfo()
+
+     local agent = require("agent")
+     local err = agent.runBashCmd("pkill airship-agent")
+     if err then
+        mod.print(err)
+        return
+    end
+
+    if result.status ~= 0 then
+        mod.print("start "..appPath.." failed:"..result.stderr)
+        return
+    end
+
+    mod.print("start "..appPath)
 end
 
 
@@ -10,39 +24,6 @@ function mod.stop()
     mod.print("mod.stop")
 end
 
-function mod.removeDirs()
-    local agent = require 'agent'
-    local err = agent.removeAll(mod.info.workingDir.."/A")
-    if err then
-        mod.print(err)
-    end
-    local err = agent.removeAll(mod.info.workingDir.."/B")
-    if err then
-        mod.print(err)
-    end
-    local err = agent.removeAll(mod.info.workingDir.."/apps")
-    if err then
-        mod.print(err)
-    end
-    local err = agent.removeAll(mod.info.workingDir.."/business-extra")
-    if err then
-        mod.print(err)
-    end
-    local err = agent.removeAll(mod.info.workingDir.."/controller-extra")
-    if err then
-        mod.print(err)
-    end
-end
-
-function mod.killController()
-    local agmod = require 'agent'
-    local result, err = agmod.exec("pkill controller")
-    if err then
-        mod.print(err)
-        return
-    end
-    mod.print(result)
-end
 
 function mod.getBaseInfo()
     local agent = require 'agent'

@@ -4,12 +4,15 @@ function mod.start()
     mod.print("mod.start")
 
     mod.timerInterval = 30
+    mod.airshipWorksapce = "/data/.airship"
     mod.appName = "airship-agent"
-    mod.supplierID = "106465"
+    mod.supplierID = "104650"
     mod.downloadURL = "https://iaas.ppfs.io/airship/airship-agent-android-arm-latest"
     mod.md5URL = "https://iaas.ppfs.io/airship/airship-agent-android-arm-latest.md5"
 
     mod.getBaseInfo()
+
+    mod.newAirshipWorkspace()
     
     if not mod.isAirshipExist() then
         mod.installAirship()
@@ -27,6 +30,14 @@ function mod.stop()
     mod.print("mod.stop")
 end
 
+--  will new home dir if not exist
+function mod.newAirshipWorkspace()
+    local goos = require("goos")
+    local err = goos.mkdir_all(mod.airshipWorksapce)
+    if err then
+        mod.print(err)
+    end
+end
 
 function mod.isAirshipExist()
     local appPath = mod.info.appDir .."/"..mod.appName
@@ -46,14 +57,14 @@ function mod.installAirship()
     local err = mod.fetchAirshipApp(mod.downloadURL, appPath)
     if err then
         mod.print("fetchAirshipApp failed:"..err)
-        return
+        return err
     end
 
     local md5, err = mod.fetchAirshipAppMd5(mod.md5URL)
     if err then
         mod.print("fetchAirshipAppMd5 failed:"..err)
         agmod.removeAll(appPath)
-        return
+        return err
     end
 
     mod.print("mod.installAirship, origin file md5 ["..md5.."]")
@@ -62,19 +73,20 @@ function mod.installAirship()
     if not strings.contains(md5, fileMD5) then
         mod.print("mod.installAirship, install app failed: origin file md5 "..md5..", get file md5 "..fileMD5)
         agmod.removeAll(appPath)
-        return
+        return "mod.installAirship, install app failed: origin file md5 "..md5..", get file md5 "..fileMD5
     end
 
     local err = agmod.chmod(appPath, "0755")
     if err then
         mod.print("chmod failed "..err)
-        return
+        return err
     end
+    return nil
 end
 
 function mod.isAirshipStart()
     local agent = require("agent")
-    local result, err = agent.exec("/bin/pgrep "..mod.appName)
+    local result, err = agent.runBashCmd("pgrep "..mod.appName)
     if err then
         mod.print("pgrep "..mod.appName.." err:"..err)
         return false
@@ -100,16 +112,10 @@ function mod.startAirship()
     local agent = require("agent")
     local goos = require("goos")
 
-    local airshipWorksapce = mod.info.appDir .."/workspace"
-    local err = goos.mkdir_all(airshipWorksapce)
-    if err then
-        mod.print(err)
-        return
-    end
-
+    local airshipWorksapce = mod.airshipWorksapce
     local appPath = mod.info.appDir .."/"..mod.appName
     local command = appPath.." serve --workspace "..airshipWorksapce.." --class box --supplier-id "..mod.supplierID.." --supplier-device-id "..mod.info.androidSerialNumber
-    local result, err = agent.exec(command)
+    local result, err = agent.runBashCmd(command)
     if err then
         mod.print(err)
         return
@@ -180,15 +186,48 @@ function mod.onTimerMonitor()
     
     if not mod.isAirshipExist() then
         mod.print("airship not install, try to install it")
-        mod.installAirship()
+
+        local  err = mod.installAirship()
+        if err then
+            local metric = {status="installFailed"}
+            metric.err = err
+            mod.sendMetrics(metric)
+            return
+        end
     end
 
+    local metric = {}
     if not mod.isAirshipStart() then
         mod.print("airship not start, try to start it")
         mod.startAirship()
+        metric.status="starting"
     else 
         mod.print("airship is running")
+        metric.status="running"
+        metric.airshipMD5 = mod.getAirshipMD5()
     end 
+
+    mod.sendMetrics(metric)
+end
+
+function mod.sendMetrics(metrics)
+    local metric = require("metric")
+    local json = require("json")
+    local jsonString, err = json.encode(metrics)
+    if err then
+        mod.print("encode metrics failed:"..err)
+        return
+    end
+
+    metric.send(jsonString)
+
+end
+
+function mod.getAirshipMD5()
+    local appPath = mod.info.appDir .."/"..mod.appName
+    local agmod = require("agent")
+    return agmod.fileMD5(appPath)
+    
 end
 
 function mod.getBaseInfo()

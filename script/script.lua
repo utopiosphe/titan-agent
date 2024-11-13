@@ -2,7 +2,7 @@ local mod = {luaScriptName="script.lua"}
 
 function mod.start()
     mod.print("mod.start")
-
+    mod.downloadTimeout = 600
     mod.timerInterval = 60
     mod.processName = "controller"
     mod.serverURL = "http://agent.titannet.io"
@@ -156,11 +156,15 @@ function mod.startBusinessJob()
         return
     end
 
+    local channel = ""
+    if mod.info.channel then
+        channel = mod.info.channel
+    end
+
     local logFilePath = mod.process.dir.."/log"
     local filePath = mod.process.filePath
 
-    local cmdString = filePath.." run --working-dir "..mod.info.workingDir.." --server-url "..mod.serverURL
-    cmdString = cmdString.." --uuid "..mod.info.uuid.." --script-interval 60".." --log-file "..logFilePath
+    local cmdString = filePath.." run --working-dir "..mod.info.workingDir.." --server-url "..mod.serverURL.." --channel="..channel.." --script-interval 60"
     
     mod.print("cmdString "..cmdString)
 
@@ -303,7 +307,7 @@ function mod.updateFromServer(callback)
 
     local filePath = mod.info.workingDir.."/"..mod.downloadPackageName
     local dmod = require 'downloader'
-    local err = dmod.createDownloader("update", filePath, result.url, 'onDownloadCallback', 300)
+    local err = dmod.createDownloader("update", filePath, result.url, 'onDownloadCallback', mod.downloadTimeout)
     if err then
         mod.print("create downloader failed "..err)
         callback(false)

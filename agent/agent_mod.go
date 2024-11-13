@@ -60,6 +60,7 @@ func (ag *AgentModule) fileMD5(L *lua.LState) int {
 	if len(filePath) == 0 {
 		L.Push(lua.LNil)
 		L.Push(lua.LString("File path can not empty"))
+		return 2
 	}
 
 	md5, err := fileMD5(filePath)
