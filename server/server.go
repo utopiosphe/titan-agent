@@ -1,38 +1,50 @@
 package server
 
 import (
+	"agent/redis"
 	"context"
 	"net/http"
 )
 
+const APIErrCode = 1
+
+type APIResult struct {
+	ErrCode int
+	ErrMsg  string
+	Data    interface{}
+}
+
 // Define a custom multiplexer type
-type ServeMux struct {
+type Server struct {
 	routes map[string]http.Handler
 }
 
-func NewServerMux(config *Config) *ServeMux {
-	handler := ServerHandler{config: config, devMgr: newDevMgr(context.Background())}
+func NewServer(config *Config) *Server {
+	redis := redis.NewRedis(config.RedisAddr)
+	handler := newServerHandler(config, newDevMgr(context.Background(), redis), redis)
 
-	mux := &ServeMux{routes: make(map[string]http.Handler)}
+	s := &Server{routes: make(map[string]http.Handler)}
 	// /update/lua support old agent
-	mux.Handle("/update/lua", http.HandlerFunc(handler.handleLuaUpdate))
-	mux.Handle("/config/lua", http.HandlerFunc(handler.handleGetLuaConfig))
-	mux.Handle("/config/controller", http.HandlerFunc(handler.handleGetControllerConfig))
-	mux.Handle("/config/apps", http.HandlerFunc(handler.handleGetAppsConfig))
+	s.handle("/update/lua", http.HandlerFunc(handler.handleLuaUpdate))
+	s.handle("/config/lua", http.HandlerFunc(handler.handleGetLuaConfig))
+	s.handle("/config/controller", http.HandlerFunc(handler.handleGetControllerConfig))
+	s.handle("/config/apps", http.HandlerFunc(handler.handleGetAppsConfig))
 
-	mux.Handle("/agent/list", http.HandlerFunc(handler.handleAgentList))
-	mux.Handle("/controller/list", http.HandlerFunc(handler.handleControllerList))
-	mux.Handle("/app/list", http.HandlerFunc(handler.handleAppList))
-	mux.Handle("/app/info", http.HandlerFunc(handler.handleAppInfo))
+	s.handle("/agent/list", http.HandlerFunc(handler.handleAgentList))
+	s.handle("/controller/list", http.HandlerFunc(handler.handleControllerList))
 
-	mux.Handle("/push/metrics", http.HandlerFunc(handler.handlePushMetrics))
+	s.handle("/api/applist", http.HandlerFunc(handler.handleGetAppList))
+	s.handle("/api/appinfo", http.HandlerFunc(handler.handleGetAppInfo))
 
-	return mux
+	s.handle("/push/metrics", http.HandlerFunc(handler.handlePushMetrics))
+	s.handle("/push/appinfo", http.HandlerFunc(handler.handlePushAppInfo))
+
+	return s
 }
 
 // Implement the ServeHTTP method for CustomServeMux
-func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	handler, found := mux.routes[r.URL.Path]
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	handler, found := s.routes[r.URL.Path]
 	if found {
 		handler.ServeHTTP(w, r)
 	} else {
@@ -41,6 +53,6 @@ func (mux *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Register a route with the custom multiplexer
-func (mux *ServeMux) Handle(pattern string, handler http.Handler) {
-	mux.routes[pattern] = handler
+func (s *Server) handle(pattern string, handler http.Handler) {
+	s.routes[pattern] = handler
 }

@@ -60,14 +60,14 @@ var runCmd = &cli.Command{
 		}
 
 		_ = config
-		mux := server.NewServerMux(config)
+		s := server.NewServer(config)
 
 		http.Handle("/", http.FileServer(http.Dir(fileServerDir)))
 
 		// Start the server
 		fmt.Println("Starting server on ", listenAddress)
 		go func() {
-			err := http.ListenAndServe(listenAddress, mux)
+			err := http.ListenAndServe(listenAddress, s)
 			if err != nil {
 				fmt.Println("Start server failed ", err.Error())
 			}

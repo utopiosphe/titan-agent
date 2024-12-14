@@ -1,9 +1,13 @@
 package server
 
 import (
+	"agent/redis"
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -11,13 +15,22 @@ const (
 	offlineTime       = 120 * time.Second
 )
 
+type Controller struct {
+	Device
+}
+
+type Agent struct {
+	Device
+}
+
 type DevMgr struct {
 	agents      sync.Map
 	controllers sync.Map
+	redis       *redis.Redis
 }
 
-func newDevMgr(ctx context.Context) *DevMgr {
-	dm := &DevMgr{}
+func newDevMgr(ctx context.Context, redis *redis.Redis) *DevMgr {
+	dm := &DevMgr{redis: redis}
 	go dm.startTicker(ctx)
 
 	return dm
@@ -38,9 +51,9 @@ func (dm *DevMgr) startTicker(ctx context.Context) {
 }
 
 func (dm *DevMgr) keepalive() {
-	offlineAgents := make([]*Device, 0)
+	offlineAgents := make([]*Agent, 0)
 	dm.agents.Range(func(key, value any) bool {
-		d := value.(*Device)
+		d := value.(*Agent)
 		if d != nil && time.Since(d.LastActivityTime) > offlineTime {
 			offlineAgents = append(offlineAgents, d)
 		}
@@ -51,9 +64,9 @@ func (dm *DevMgr) keepalive() {
 		dm.removeAgent(d)
 	}
 
-	offlineControllers := make([]*Device, 0)
+	offlineControllers := make([]*Controller, 0)
 	dm.controllers.Range(func(key, value any) bool {
-		d := value.(*Device)
+		d := value.(*Controller)
 		if d != nil && time.Since(d.LastActivityTime) > offlineTime {
 			offlineControllers = append(offlineControllers, d)
 		}
@@ -65,69 +78,69 @@ func (dm *DevMgr) keepalive() {
 	}
 }
 
-func (dm *DevMgr) addAgent(device *Device) {
-	dm.agents.Store(device.UUID, device)
+func (dm *DevMgr) addAgent(agent *Agent) {
+	dm.agents.Store(agent.UUID, agent)
 }
 
-func (dm *DevMgr) removeAgent(device *Device) {
-	dm.agents.Delete(device.UUID)
+func (dm *DevMgr) removeAgent(agent *Agent) {
+	dm.agents.Delete(agent.UUID)
 }
 
-func (dm *DevMgr) getAgent(uuid string) *Device {
+func (dm *DevMgr) getAgent(uuid string) *Agent {
 	v, ok := dm.agents.Load(uuid)
 	if !ok {
 		return nil
 	}
-	return v.(*Device)
+	return v.(*Agent)
 }
 
-func (dm *DevMgr) getAgents() []*Device {
-	devices := make([]*Device, 0)
+func (dm *DevMgr) getAgents() []*Agent {
+	agents := make([]*Agent, 0)
 	dm.agents.Range(func(key, value any) bool {
-		d := value.(*Device)
+		d := value.(*Agent)
 		if d != nil {
-			devices = append(devices, d)
+			agents = append(agents, d)
 		}
 		return true
 	})
 
-	return devices
+	return agents
 }
 
-func (dm *DevMgr) updateAgent(d *Device) {
-	if len(d.UUID) == 0 {
+func (dm *DevMgr) updateAgent(ag *Agent) {
+	if len(ag.UUID) == 0 {
 		return
 	}
 
-	device := dm.getAgent(d.UUID)
-	if device == nil {
-		dm.addAgent(d)
+	agent := dm.getAgent(ag.UUID)
+	if agent == nil {
+		dm.addAgent(ag)
 		return
 	}
 
-	device.LastActivityTime = d.LastActivityTime
+	agent.LastActivityTime = ag.LastActivityTime
 }
 
-func (dm *DevMgr) addController(device *Device) {
-	dm.controllers.Store(device.UUID, device)
+func (dm *DevMgr) addController(controller *Controller) {
+	dm.controllers.Store(controller.UUID, controller)
 }
 
-func (dm *DevMgr) removeController(device *Device) {
-	dm.controllers.Delete(device.UUID)
+func (dm *DevMgr) removeController(controller *Controller) {
+	dm.controllers.Delete(controller.UUID)
 }
 
-func (dm *DevMgr) getController(uuid string) *Device {
+func (dm *DevMgr) getController(uuid string) *Controller {
 	v, ok := dm.controllers.Load(uuid)
 	if !ok {
 		return nil
 	}
-	return v.(*Device)
+	return v.(*Controller)
 }
 
-func (dm *DevMgr) getControllers() []*Device {
-	controllers := make([]*Device, 0)
+func (dm *DevMgr) getControllers() []*Controller {
+	controllers := make([]*Controller, 0)
 	dm.controllers.Range(func(key, value any) bool {
-		d := value.(*Device)
+		d := value.(*Controller)
 		if d != nil {
 			controllers = append(controllers, d)
 		}
@@ -137,16 +150,36 @@ func (dm *DevMgr) getControllers() []*Device {
 	return controllers
 }
 
-func (dm *DevMgr) updateController(d *Device) {
-	if len(d.UUID) == 0 {
+func (dm *DevMgr) updateController(c *Controller) {
+	if len(c.UUID) == 0 {
 		return
 	}
 
-	controller := dm.getController(d.UUID)
+	controller := dm.getController(c.UUID)
 	if controller == nil {
-		dm.addController(d)
+		dm.addController(c)
+		dm.redis.SetNode(context.Background(), controllerToNode(c))
 		return
 	}
 
-	controller.LastActivityTime = d.LastActivityTime
+	controller.LastActivityTime = c.LastActivityTime
+}
+
+func controllerToNode(c *Controller) *redis.Node {
+	buf, err := json.Marshal(c)
+	if err != nil {
+		log.Error("controllerToNode ", err.Error())
+		return nil
+	}
+
+	node := &redis.Node{}
+	err = json.Unmarshal(buf, node)
+	if err != nil {
+		log.Error("controllerToNode ", err.Error())
+		return nil
+	}
+
+	node.ID = c.UUID
+	node.LastActivityTime = time.Now()
+	return node
 }

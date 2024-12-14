@@ -1,0 +1,58 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: emc-titan-l2
+  namespace: emc-titan-l2
+  labels:
+    channel: emc-titan-l2
+  annotations:
+    deprecated.daemonset.template.generation: '2'
+    kubesphere.io/creator: admin
+spec:
+  selector:
+    matchLabels:
+      channel: emc-titan-l2
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        channel: emc-titan-l2
+      annotations:
+        kubesphere.io/creator: admin
+        kubesphere.io/imagepullsecrets: '{}'
+        logging.kubesphere.io/logsidecar-config: '{}'
+    spec:
+      volumes:
+        - name: titan-l2-home
+          hostPath:
+            path: /root/.titanedge
+            type: ''
+      containers:
+        - name: container-5t8glo
+          image: 'nezha123/titan-edge:1.5_amd64'
+          ports:
+            - name: http-0
+              containerPort: 1234
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - name: titan-l2-home
+              mountPath: /root/.titanedge
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: IfNotPresent
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      nodeSelector:
+        channel: emc-titan-l2
+      serviceAccountName: default
+      serviceAccount: default
+      securityContext: {}
+      schedulerName: default-scheduler
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 20%
+      maxSurge: 0
+  revisionHistoryLimit: 10

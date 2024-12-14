@@ -17,6 +17,8 @@ type Config struct {
 	NodeTags           map[string][]string  `json:"nodeTags"`
 	TestNodes          map[string]*TestApp  `json:"testNodes"`
 	ChannelApps        map[string][]string  `json:"channelApps"`
+
+	RedisAddr string
 }
 
 type FileConfig struct {

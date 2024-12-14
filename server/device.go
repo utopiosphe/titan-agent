@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-type Controller struct {
-	Version          string
-	LastActivityTime time.Time
-}
-
 type Device struct {
 	UUID                string
 	AndroidID           string
@@ -39,7 +34,8 @@ type Device struct {
 
 	LastActivityTime time.Time
 
-	Controller *Controller
+	//TODO: get controller md5
+	ControllerMD5 string
 
 	IP string
 

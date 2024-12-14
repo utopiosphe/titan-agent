@@ -45,7 +45,7 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:  "channel",
-				Usage: "--channel titan-l1 or painet",
+				Usage: "--channel titan-l1, channel: titan-l1,painet,emc-titan-l2",
 				Value: "titan-l1",
 			},
 		},

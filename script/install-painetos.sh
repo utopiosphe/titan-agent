@@ -13,6 +13,18 @@ fi
 
 INSTALL_IMAGE_PATH=$1
 
+
+#######################################################
+########## create bridge br0 ###########################
+if ip link show br0 > /dev/null 2>&1; then
+  echo "bridge br0 already exist"
+else
+    ip link add name br0 type bridge
+    ip addr add 192.168.100.1/24 brd + dev br0
+    ip link set br0 up
+fi
+
+
 # Check if QEMU is installed
 if command -v qemu-system-x86_64 > /dev/null 2>&1; then
     echo "QEMU is installed. Version information is as follows:"
@@ -93,7 +105,7 @@ else
     memory_mb=$(bc <<< "scale=0; $total_memory_kb / 1024")
 
     if (( $(echo "$memory_mb > 2048" | bc -l) )); then
-        new_memory=$(bc <<< "$total_memory_mb - 2048")
+        memory_mb=$(bc <<< "$memory_mb - 2048")
     fi
 
     echo "alocate memory $memory_mb"

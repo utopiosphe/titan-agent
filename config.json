@@ -89,7 +89,16 @@
             "versoin":"0.0.1",
             "scriptMD5":"585f384ec97532e9822b7863ddeb958a",
             "scriptURL":"https://agent.titannet.io/android-airship.lua"
+        },
+        {
+            "name":"install-kubeedge",
+            "appDir":"install-kubeedge",
+            "scriptName":"install-kubeedge.lua",
+            "versoin":"0.0.1",
+            "scriptMD5":"585f384ec97532e9822b7863ddeb958a",
+            "scriptURL":"https://agent.titannet.io/install-kubeedge.lua"
         }
+
 
 
 
@@ -128,6 +137,10 @@
                 "apps":["test-airship"]
         }
     
+    },
+    "channelApps":{
+        "titan-l1":["k8s-worker"],
+        "emc-titan-l2":[""]
     }
 
 

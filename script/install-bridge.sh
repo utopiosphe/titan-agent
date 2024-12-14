@@ -24,15 +24,19 @@ else
 fi
 
 
-interface=$(ip -o -4 addr show | grep -E "en|eth" | grep -E '^[2-9]' | awk '{print $2}')
-
-######## forward br0 to eth0
-RULE="FORWARD -m physdev --physdev-is-bridged -j ACCEPT"
-if ! iptables -S FORWARD | grep -q "$RULE"; then
-    echo "iptables -I $RULE"
-    iptables -I $RULE
+######## allow br0 forward
+if ! iptables -S FORWARD | grep -q "FORWARD -i br0 -j ACCEPT"; then
+    echo "iptables -t filter -A FORWARD -i br0 -j ACCEPT"
+    iptables -t filter -A FORWARD -i br0 -j ACCEPT
 else
-    echo "iptable rule: iptables -I $RULE alread exist"
+    echo "iptable rule: 'iptables -t filter -A FORWARD -i br0 -j ACCEPT' alread exist"
+fi
+
+if ! iptables -S FORWARD | grep -q "FORWARD -o br0 -j ACCEPT"; then
+    echo "iptables -t filter -A FORWARD -o br0 -j ACCEPT"
+    iptables -t filter -A FORWARD -o br0 -j ACCEPT
+else
+    echo "iptable rule: 'iptables -t filter -A FORWARD -o br0 -j ACCEPT' alread exist"
 fi
 
 #######################################################
@@ -75,7 +79,7 @@ else
     mv einat-static-x86_64-unknown-linux-musl /usr/local/bin/einat
     chmod +x /usr/local/bin/einat
 
-    interface=$(ip -o -4 addr show | grep -E "en|eth" | grep -E '^[2-9]' | awk '{print $2}')
+    interface=$(ip -o -4 addr show | grep -E "en|eth|bond" | grep -E '^[2-9]' | awk '{print $2}')
     ###　get network interface
     SERVICE_FILE="/etc/systemd/system/einat.service"
     cat >$SERVICE_FILE <<EOF
@@ -129,7 +133,7 @@ else
     modprobe nbd
     qemu-nbd --connect=/dev/nbd0 $DISK_PATH
     echo -e "n\np\n1\n\n\nw" | fdisk /dev/nbd0
-    mkfs.xfs /dev/nbd0
+    mkfs.xfs -f /dev/nbd0
     qemu-nbd --disconnect /dev/nbd0
 
     INSERT_POS=$(grep -n '</devices>' $VM_XML_FILE | cut -d: -f1)

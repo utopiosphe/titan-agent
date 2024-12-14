@@ -9,14 +9,21 @@ function mod.start()
     if not mod.isInstallKubeedge() and mod.isRoot() then
         -- install kube
         mod.print("install kubeedge..")
-        local err = mod.installKubeedge()
+        local outputInfo, err = mod.installKubeedge()
         if err then
             mod.print("installKubeedge error "..err)
+            mod.installErr = err
+        else 
+            mod.print("installKubeedge info:", outputInfo)
         end
     end
 
-    if not mod.isKubeedgeStart() then
-        mod.startKubeAndJoinCluster()
+    if mod.isInstallKubeedge() and not mod.isKubeedgeStart() then
+        local err= mod.startKubeAndJoinCluster()
+        if err then
+            mod.print("startKubeAndJoinCluster error "..err)
+            mod.runErr = err
+        end
     end
 
     mod.startTimer()
@@ -80,13 +87,12 @@ end
 
 function mod.installKubeedge()
     if not mod.installKubeedgeScriptPath then
-        mod.fetchInstallKubeedgeScript()
+        local err = mod.fetchInstallKubeedgeScript()
+        if err then
+            return nil, err
+        end
     end
-
-    if not mod.installKubeedgeScriptPath then
-        return
-    end
-
+    
     local agmod = require("agent")
     local result, err = agmod.exec(mod.installKubeedgeScriptPath,300)
     if err then
@@ -112,17 +118,16 @@ function mod.fetchInstallKubeedgeScript()
     local scriptPath = mod.info.appDir .."/"..scriptName
     local err = mod.downloadScript(scriptURL, scriptPath)
     if err then
-        mod.print("get script error "..err)
-        return 
+        return  err
     end
     local agmod = require("agent")
     local err = agmod.chmod(scriptPath, "0755")
     if err then
-        mod.print("chmod failed "..err)
-        return
+        return err
     end
     
     mod.installKubeedgeScriptPath = scriptPath
+    return nil
 end
 
 function mod.downloadScript(url, filePath) 
@@ -159,6 +164,7 @@ function mod.isKubeedgeStart()
 
     if result.status ~= 0 then
         mod.print("pgrep keadm failed:"..result.stderr)
+        return false
     end
 
     if result.stdout and result.stdout ~= "" then
@@ -168,20 +174,29 @@ function mod.isKubeedgeStart()
 end
 
 function mod.startKubeAndJoinCluster()
-    local command = "sudo keadm join --kubeedge-version=1.13.1 --cloudcore-ipport=8.218.162.82:10000 --quicport 10001 --certport 10002 --tunnelport 10004 --edgenode-name $(uuid) --token 00a4692cfe5f24b1d9bf065d30de210238b9258dda25d05443518fbd2806b854.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzA3MzczMDN9.WPHaNGYNoUrEKGvdcMTxzQ5JkKJP8H8vT3iWaiT6sQc"
     local agmod = require("agent")
-    local result, err = agmod.runBashCmd(command)
+    -- remove old config
+    agmod.runBashCmd("rm /etc/kubeedge")
+    -- must use root user to exec keadm
+    local command = "sudo keadm join --kubeedge-version=1.19.0 --cloudcore-ipport=8.218.162.82:10000  --edgenode-name abc --token c7dfdc642e51dd377fb86f50ea138256ae232e2b3c2ccc07e90b1552a6b86946.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MzE5OTE1MjZ9.MQNjP66MxOeTNafYM1sN2UaKWqVrYGh_S1i9kqH7-4c"
+    local result, err = agmod.runBashCmd(command, 300)
     if err then
-        mod.print(err)
-        return
+        return err
     end
 
     if result.status ~= 0 then
-        mod.print("start kube failed:"..result.stderr)
-        return
+        return "start kube failed, status:"..result.stderr
     end
 
-    mod.print("start kube successed")
+    if result.stderr and result.stderr ~= "" then
+        return result.stderr
+    end
+
+    if result.stdout and result.stdout != "" then
+        mod.print("start kube successed: ", result.stdout)
+    end
+
+    return nil
 end
 
 function mod.stop()
@@ -197,18 +212,52 @@ function mod.onTimerMonitor()
     mod.print("mod.onTimerMonitor")
     if not mod.isInstallKubeedge() and mod.isRoot() then
         -- install kube
-        local err = mod.installKubeedge()
+        local info, err = mod.installKubeedge()
         if err then
             mot.print("installKubeedge error "..err)
+            mod.installErr = err
+        else 
+            mot.print("installKubeedge: "..info)
         end
     end
 
-    if not mod.isKubeedgeStart() then
-        mod.startKubeAndJoinCluster()
+    local metric = {}
+    if mod.isInstallKubeedge() and not mod.isKubeedgeStart() then
+        local err = mod.startKubeAndJoinCluster()
+        if err then
+            mot.print("startKubeAndJoinCluster error "..err)
+            mod.runErr = err
+        end
+        metric.status = "installing"
+        mod.installErr = nil
+    else 
+        metric.status = "running"
     end
+
+    if mod.installErr then
+        metric.installErr = installErr
+    end
+
+    if mod.runErr then
+        metric.runErr = runErr
+    end
+
+    sendMetrics(metric)
 
 end
 
+function mod.sendMetrics(metrics)
+    local metric = require("metric")
+    local json = require("json")
+    local jsonString, err = json.encode(metrics)
+    if err then
+        mod.print("encode metrics  failed:"..err)
+        return
+    end
+
+    metric.send(jsonString)
+
+end
 
 function mod.getBaseInfo()
     local agent = require 'agent'

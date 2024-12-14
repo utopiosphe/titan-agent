@@ -1,8 +1,10 @@
 package server
 
 import (
+	"agent/redis"
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,7 +17,11 @@ import (
 type ServerHandler struct {
 	config *Config
 	devMgr *DevMgr
-	// appMap sync.Map
+	redis  *redis.Redis
+}
+
+func newServerHandler(config *Config, devMgr *DevMgr, redis *redis.Redis) *ServerHandler {
+	return &ServerHandler{config: config, devMgr: devMgr, redis: redis}
 }
 
 func (h *ServerHandler) handleGetLuaConfig(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +34,7 @@ func (h *ServerHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) 
 	d := NewDeviceFromURLQuery(r.URL.Query())
 	if d != nil {
 		d.IP = getReadIP(r)
-		h.devMgr.updateAgent(d)
+		h.devMgr.updateAgent(&Agent{*d})
 	}
 
 	os := r.URL.Query().Get("os")
@@ -113,7 +119,7 @@ func (h *ServerHandler) handleGetAppsConfig(w http.ResponseWriter, r *http.Reque
 	d := NewDeviceFromURLQuery(r.URL.Query())
 	if d != nil {
 		d.IP = getReadIP(r)
-		h.devMgr.updateController(d)
+		h.devMgr.updateController(&Controller{*d})
 	}
 
 	uuid := r.URL.Query().Get("uuid")
@@ -203,14 +209,14 @@ func (h *ServerHandler) isAppMatchChannel(appName string, channel string) bool {
 func (h *ServerHandler) handleAgentList(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("handleAgentList, queryString %s\n", r.URL.RawQuery)
 
-	devices := h.devMgr.getAgents()
+	agents := h.devMgr.getAgents()
 
 	result := struct {
-		Total   int       `json:"total"`
-		Devices []*Device `json:"devices"`
+		Total  int      `json:"total"`
+		Agents []*Agent `json:"agents"`
 	}{
-		Total:   len(devices),
-		Devices: devices,
+		Total:  len(agents),
+		Agents: agents,
 	}
 
 	formattedJSON, err := json.MarshalIndent(result, "", "  ")
@@ -226,14 +232,14 @@ func (h *ServerHandler) handleAgentList(w http.ResponseWriter, r *http.Request) 
 func (h *ServerHandler) handleControllerList(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("handleControllerList, queryString %s\n", r.URL.RawQuery)
 
-	devices := h.devMgr.getControllers()
+	controllers := h.devMgr.getControllers()
 
 	result := struct {
-		Total   int       `json:"total"`
-		Devices []*Device `json:"devices"`
+		Total       int           `json:"total"`
+		Controllers []*Controller `json:"controllers"`
 	}{
-		Total:   len(devices),
-		Devices: devices,
+		Total:       len(controllers),
+		Controllers: controllers,
 	}
 
 	formattedJSON, err := json.MarshalIndent(result, "", "  ")
@@ -246,10 +252,72 @@ func (h *ServerHandler) handleControllerList(w http.ResponseWriter, r *http.Requ
 	w.Write(formattedJSON)
 }
 
-func (h *ServerHandler) handleAppList(w http.ResponseWriter, r *http.Request) {
+func (h *ServerHandler) handleGetAppList(w http.ResponseWriter, r *http.Request) {
+	uuid := r.URL.Query().Get("id")
+
+	apps, err := h.redis.GetNodeAppList(context.Background(), uuid)
+	if err != nil {
+		apiResultErr(w, err.Error())
+		return
+	}
+
+	result := APIResult{Data: apps}
+	buf, err := json.Marshal(result)
+	if err != nil {
+		log.Error("ServerHandler.handleGetAppList, Marshal: ", err.Error())
+		return
+	}
+
+	if _, err := w.Write(buf); err != nil {
+		log.Error("ServerHandler.handleGetAppList, Write: ", err.Error())
+	}
+
 }
 
-func (h *ServerHandler) handleAppInfo(w http.ResponseWriter, r *http.Request) {
+func (h *ServerHandler) handleGetAppInfo(w http.ResponseWriter, r *http.Request) {
+	uuid := r.URL.Query().Get("id")
+	appName := r.URL.Query().Get("app")
+
+	// TODO: convert id to uuid format
+	// TODO：check app if exist
+
+	app, err := h.redis.GetNodeApp(context.Background(), uuid, appName)
+	if err != nil {
+		apiResultErr(w, err.Error())
+		return
+	}
+
+	res := struct {
+		AppName string `json:"appName"`
+		NodeID  string `json:"nodeID"`
+	}{}
+
+	err = json.Unmarshal([]byte(app.Metric), &res)
+	if err != nil {
+		apiResultErr(w, err.Error())
+		return
+	}
+
+	if app.AppName == "titan-l2" && len(res.NodeID) == 0 {
+		apiResultErr(w, "titan-l2 not exist")
+		return
+	}
+
+	res.AppName = app.AppName
+
+	result := APIResult{Data: res}
+	buf, err := json.Marshal(result)
+	if err != nil {
+		log.Error("ServerHandler.handleGetAppList, Marshal: ", err.Error())
+		return
+	}
+
+	if _, err := w.Write(buf); err != nil {
+		log.Error("ServerHandler.handleGetAppList, Write: ", err.Error())
+	}
+}
+
+func (h *ServerHandler) handlePushAppInfo(w http.ResponseWriter, r *http.Request) {
 	uuid := r.URL.Query().Get("uuid")
 	appName := r.URL.Query().Get("appName")
 
@@ -286,13 +354,6 @@ func (h *ServerHandler) handleAppInfo(w http.ResponseWriter, r *http.Request) {
 
 func (h *ServerHandler) handlePushMetrics(w http.ResponseWriter, r *http.Request) {
 	uuid := r.URL.Query().Get("uuid")
-	c := h.devMgr.getController(uuid)
-	if c == nil {
-		log.Errorf("ServerHandler.handlePushMetrics controller %s not exist", uuid)
-		resultError(w, http.StatusBadRequest, fmt.Sprintf("controller %s not exist", uuid))
-		return
-	}
-	// appName := r.URL.Query().Get("appName")
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -317,12 +378,78 @@ func (h *ServerHandler) handlePushMetrics(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if err := h.updateNodeApps(uuid, apps); err != nil {
+		log.Error("ServerHandler.handlePushMetrics update nodes app failed:", err.Error())
+	}
+
+	c := h.devMgr.getController(uuid)
+	if c == nil {
+		log.Errorf("ServerHandler.handlePushMetrics controller %s not exist", uuid)
+		resultError(w, http.StatusBadRequest, fmt.Sprintf("controller %s not exist", uuid))
+		return
+	}
 	c.AppList = apps
+}
+
+// 1. 拉取旧app的metric
+// 2. 如果当前的app没有metric,则保留旧的metric
+// 3. 删除所有旧的app
+// 4. 保存当前的所有app
+func (h *ServerHandler) updateNodeApps(nodeID string, apps []*App) error {
+	nodeApps := make([]*redis.NodeApp, 0, len(apps))
+	for _, app := range apps {
+		nodeApps = append(nodeApps, &redis.NodeApp{AppName: app.AppName, MD5: app.ScriptMD5, Metric: app.Metric})
+	}
+	appNames, err := h.redis.GetNodeAppList(context.Background(), nodeID)
+	if err != nil {
+		return err
+	}
+
+	oldApps, err := h.redis.GetNodeApps(context.Background(), nodeID, appNames)
+	if err != nil {
+		return err
+	}
+
+	oldAppMap := make(map[string]*redis.NodeApp)
+	for _, app := range oldApps {
+		oldAppMap[app.AppName] = app
+	}
+
+	for _, app := range nodeApps {
+		if oldApp := oldAppMap[app.AppName]; oldApp != nil {
+			if len(app.Metric) == 0 && len(oldApp.Metric) != 0 {
+				app.Metric = oldApp.Metric
+			}
+		}
+	}
+
+	if err = h.redis.DeleteNodeApps(context.Background(), nodeID, appNames); err != nil {
+		return err
+	}
+
+	if err = h.redis.SetNodeApps(context.Background(), nodeID, nodeApps); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func resultError(w http.ResponseWriter, statusCode int, errMsg string) {
 	w.WriteHeader(statusCode)
 	w.Write([]byte(errMsg))
+}
+
+func apiResultErr(w http.ResponseWriter, errMsg string) {
+	result := APIResult{ErrCode: APIErrCode, ErrMsg: errMsg}
+	buf, err := json.Marshal(result)
+	if err != nil {
+		log.Error("apiResult, Marshal: ", err.Error())
+		return
+	}
+
+	if _, err := w.Write(buf); err != nil {
+		log.Error("apiResult, Write: ", err.Error())
+	}
 }
 
 // cpu/number memory/MB disk/GB

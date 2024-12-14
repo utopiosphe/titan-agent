@@ -146,7 +146,7 @@ function mod.onTimerMonitor()
             metric.installLog = mod.installLog
          end
     end
-
+    
     mod.sendMetrics(metric)
 end
 
