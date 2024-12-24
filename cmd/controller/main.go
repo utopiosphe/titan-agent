@@ -81,7 +81,7 @@ var runCmd = &cli.Command{
 			Name:    "script-interval",
 			Usage:   "--script-interval 60",
 			EnvVars: []string{"SCRIPT_INTERVAL"},
-			Value:   60,
+			Value:   10,
 		},
 		&cli.StringFlag{
 			Name:     "server-url",
@@ -89,6 +89,20 @@ var runCmd = &cli.Command{
 			EnvVars:  []string{"SERVER_URL"},
 			Required: true,
 			Value:    "http://localhost:8080/update/lua",
+		},
+		&cli.StringFlag{
+			Name:     "web-url",
+			Usage:    "--web-url http://localhost:8080",
+			EnvVars:  []string{"WEB_URL"},
+			Value:    "http://localhost:8080",
+			Required: true,
+		},
+		&cli.StringFlag{
+			Name:     "key",
+			Usage:    "--key xxx",
+			EnvVars:  []string{"KEY"},
+			Value:    "",
+			Required: true,
 		},
 		&cli.StringFlag{
 			Name:    "rel-apps-dir",
@@ -136,6 +150,8 @@ var runCmd = &cli.Command{
 			os.Stdout = file
 		}
 
+		log.Println(logoWindow)
+
 		args := &controller.ConrollerArgs{
 			WorkingDir:           cctx.String("working-dir"),
 			ServerURL:            cctx.String("server-url"),
@@ -143,6 +159,8 @@ var runCmd = &cli.Command{
 			AppConfigsFileName:   cctx.String("appconfigs-filename"),
 			RelAppsDir:           cctx.String("rel-apps-dir"),
 			Channel:              cctx.String("channel"),
+			WebServerUrl:         cctx.String("web-url"),
+			KEY:                  cctx.String("key"),
 		}
 
 		ctr, err := controller.New(args)
@@ -179,3 +197,24 @@ func main() {
 		log.Fatal(err)
 	}
 }
+
+const (
+	logoWindow = `
+╭━━━━━━━━━━━━━━━━━━━━━━━━╮
+┃ ▀█▀ █ ▀█▀ ▄▀█ █▄░█     ┃
+┃ ░█░ █ ░█░ █▀█ █░▀█     ┃
+┃━━━━━━━━━━━━━━━━━━━━━━━━┃
+┃  4th Galileo TestNet   ┃
+┃      Version 1.0.0     ┃
+╰━━━━━━━━━━━━━━━━━━━━━━━━╯
+	`
+	MonitorWindow = `
+		📡 Network Status
+╭─────────────────────────────╮
+│ Node ID: XXXXXXXX           │
+│ Peers: 6 connected          │
+│ Status: Mining              │
+│ Blocks: #1234567            │
+╰─────────────────────────────╯
+`
+)

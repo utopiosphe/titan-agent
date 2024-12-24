@@ -60,7 +60,10 @@ var runCmd = &cli.Command{
 		}
 
 		_ = config
-		s := server.NewServer(config)
+		s, err := server.NewServer(config)
+		if err != nil {
+			return fmt.Errorf("failed to create server: %v", err)
+		}
 
 		http.Handle("/", http.FileServer(http.Dir(fileServerDir)))
 

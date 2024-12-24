@@ -27,4 +27,7 @@ const (
 	RedisKeyNode        = "titan:agent:node:%s"
 	RedisKeyNodeAppList = "titan:agent:nodeAppList:%s"
 	RedisKeyNodeApp     = "titan:agent:nodeApp:%s:%s"
+
+	RedisKeyNodeRegist        = "titan:agent:nodeRegist"
+	RedisKeyNodeOnlineDuration = "titan:agent:nodeOnlineDuration:%s"
 )

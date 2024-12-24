@@ -1,6 +1,7 @@
 package server
 
 import (
+	titanrsa "agent/common/rsa"
 	"encoding/json"
 	"os"
 )
@@ -18,7 +19,8 @@ type Config struct {
 	TestNodes          map[string]*TestApp  `json:"testNodes"`
 	ChannelApps        map[string][]string  `json:"channelApps"`
 
-	RedisAddr string
+	RedisAddr  string
+	PrivateKey string
 }
 
 type FileConfig struct {
@@ -66,6 +68,30 @@ func ParseConfig(filePath string) (*Config, error) {
 	err = json.Unmarshal(buf, &config)
 	if err != nil {
 		return nil, err
+	}
+
+	changed := false
+
+	if config.PrivateKey == "" {
+		bits := 1024
+		priKey, err := titanrsa.GeneratePrivateKey(bits)
+		if err != nil {
+			return nil, err
+		}
+		priKeyPem := titanrsa.PrivateKey2Pem(priKey)
+		config.PrivateKey = string(priKeyPem)
+		changed = true
+	}
+
+	if changed {
+		buf, err := json.MarshalIndent(config, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		err = os.WriteFile(filePath, buf, 0644)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &config, nil

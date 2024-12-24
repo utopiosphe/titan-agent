@@ -117,7 +117,6 @@ func (a *Agent) updateScriptFromServer() {
 		log.Errorf("updateScriptFromServer get update config: %s", err.Error())
 		return
 	}
-
 	if a.scriptFileMD5 == updateConfig.MD5 {
 		return
 	}

@@ -3,11 +3,14 @@ package redis
 import (
 	"context"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 )
 
 type Node struct {
-	ID string `redis:"id"`
+	ID   string `redis:"id"`
+	UUID string `redis:"uuid"`
 	// AndroidID           string
 	// AndroidSerialNumber string
 
@@ -79,4 +82,68 @@ func (redis *Redis) GetNode(ctx context.Context, nodeID string) (*Node, error) {
 	}
 
 	return &n, nil
+}
+
+func (r *Redis) GetNodeList(ctx context.Context, lastActiveTime time.Time) ([]*Node, error) {
+
+	var (
+		cursor uint64
+		ret    []*Node
+	)
+
+	nodeKeyPattern := strings.Replace(RedisKeyNode, "%s", "*", -1)
+	for {
+		keys, nextCursor, err := r.client.Scan(ctx, cursor, nodeKeyPattern, 100).Result()
+		if err != nil {
+			fmt.Println("Error scanning keys:", err)
+			break
+		}
+
+		for _, key := range keys {
+			res := r.client.HGetAll(ctx, key)
+			if res.Err() != nil {
+				// return nil, res.Err()
+				log.Printf("Error HGetAll: %v", res.Err())
+				continue
+			}
+
+			var n Node
+			if err := res.Scan(&n); err != nil {
+				// return nil, err
+				log.Printf("Error scan node: %v", err)
+				continue
+			}
+
+			if n.LastActivityTime.After(lastActiveTime) {
+				ret = append(ret, &n)
+			}
+
+		}
+
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return ret, nil
+}
+
+func (r *Redis) IncrNodeOnlineDuration(ctx context.Context, nodeid string, minutes int) error {
+	if len(nodeid) == 0 {
+		return fmt.Errorf("Redis.IncrNodeOnlineDuration: nodeID can not empty")
+	}
+	if minutes <= 0 {
+		return fmt.Errorf("Redis.IncrNodeOnlineDuration: minutes can not less than or equal to zero")
+	}
+	key := fmt.Sprintf(RedisKeyNodeOnlineDuration, nodeid)
+	return r.client.IncrBy(ctx, key, int64(minutes)).Err()
+}
+
+func (r *Redis) GetNodeOnlineDuration(ctx context.Context, nodeid string) (int64, error) {
+	if len(nodeid) == 0 {
+		return 0, fmt.Errorf("Redis.GetNodeOnlineDuration: nodeID can not empty")
+	}
+	key := fmt.Sprintf(RedisKeyNodeOnlineDuration, nodeid)
+	return r.client.Get(ctx, key).Int64()
 }

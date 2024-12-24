@@ -16,6 +16,7 @@ const (
 )
 
 type Controller struct {
+	NodeID string
 	Device
 }
 
@@ -27,6 +28,10 @@ type DevMgr struct {
 	agents      sync.Map
 	controllers sync.Map
 	redis       *redis.Redis
+}
+
+func NodeOfflineTime() time.Duration {
+	return offlineTime
 }
 
 func newDevMgr(ctx context.Context, redis *redis.Redis) *DevMgr {
@@ -122,15 +127,15 @@ func (dm *DevMgr) updateAgent(ag *Agent) {
 }
 
 func (dm *DevMgr) addController(controller *Controller) {
-	dm.controllers.Store(controller.UUID, controller)
+	dm.controllers.Store(controller.NodeID, controller)
 }
 
 func (dm *DevMgr) removeController(controller *Controller) {
-	dm.controllers.Delete(controller.UUID)
+	dm.controllers.Delete(controller.NodeID)
 }
 
-func (dm *DevMgr) getController(uuid string) *Controller {
-	v, ok := dm.controllers.Load(uuid)
+func (dm *DevMgr) getController(nodeID string) *Controller {
+	v, ok := dm.controllers.Load(nodeID)
 	if !ok {
 		return nil
 	}
@@ -151,11 +156,11 @@ func (dm *DevMgr) getControllers() []*Controller {
 }
 
 func (dm *DevMgr) updateController(c *Controller) {
-	if len(c.UUID) == 0 {
+	if len(c.NodeID) == 0 {
 		return
 	}
 
-	controller := dm.getController(c.UUID)
+	controller := dm.getController(c.NodeID)
 	if controller == nil {
 		dm.addController(c)
 		dm.redis.SetNode(context.Background(), controllerToNode(c))
@@ -163,6 +168,7 @@ func (dm *DevMgr) updateController(c *Controller) {
 	}
 
 	controller.LastActivityTime = c.LastActivityTime
+	dm.redis.IncrNodeOnlineDuration(context.Background(), controller.NodeID, int(offlineTime))
 }
 
 func controllerToNode(c *Controller) *redis.Node {
@@ -179,7 +185,8 @@ func controllerToNode(c *Controller) *redis.Node {
 		return nil
 	}
 
-	node.ID = c.UUID
+	node.ID = c.NodeID
+	node.UUID = c.Device.UUID
 	node.LastActivityTime = time.Now()
 	return node
 }

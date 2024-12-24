@@ -2,7 +2,11 @@ package redis
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
+	"strings"
+	"time"
 
 	goredis "github.com/redis/go-redis/v9"
 )
@@ -21,9 +25,22 @@ type App struct {
 // NodeApp Information that is unique to the node
 // Metric includes the app's operational status, as well as unique information
 type NodeApp struct {
-	AppName string `redis:"appName"`
-	MD5     string `redis:"md5"`
-	Metric  string `redis:"metric"`
+	AppName          string       `redis:"appName"`
+	MD5              string       `redis:"md5"`
+	Metric           MetricString `redis:"metric"`
+	LastActivityTime time.Time    `redis:"lastActivityTime"`
+}
+
+type MetricString string
+
+func (m MetricString) GetClientID() string {
+	var metric NodeAppBaseMetrics
+	json.Unmarshal([]byte(m), &metric)
+	return metric.ClientID
+}
+
+type NodeAppBaseMetrics struct {
+	ClientID string // third-party unique id
 }
 
 func (redis *Redis) SetApp(ctx context.Context, app *App) error {
@@ -117,6 +134,8 @@ func (redis *Redis) SetNodeApp(ctx context.Context, nodeID string, nApp *NodeApp
 		return fmt.Errorf("Redis.SetNodeApp: node app name can not empty")
 	}
 
+	nApp.LastActivityTime = time.Now()
+
 	key := fmt.Sprintf(RedisKeyNodeApp, nodeID, nApp.AppName)
 	err := redis.client.HSet(ctx, key, nApp).Err()
 	if err != nil {
@@ -133,8 +152,10 @@ func (redis *Redis) SetNodeApps(ctx context.Context, nodeID string, nodeApps []*
 
 	pipe := redis.client.Pipeline()
 
+	tn := time.Now()
 	for _, app := range nodeApps {
 		key := fmt.Sprintf(RedisKeyNodeApp, nodeID, app.AppName)
+		app.LastActivityTime = tn
 		pipe.HSet(ctx, key, app).Err()
 	}
 
@@ -257,4 +278,57 @@ func (redis *Redis) GetNodeAppList(ctx context.Context, nodeID string) ([]string
 	}
 
 	return appNames, nil
+}
+
+type NodeAppExtra struct {
+	*NodeApp
+	NodeID string
+}
+
+func (r *Redis) GetAllAppInfos(ctx context.Context, lastActiveTime time.Time) ([]*NodeAppExtra, error) {
+
+	var (
+		cursor uint64
+		ret    []*NodeAppExtra
+	)
+
+	nodeAppKeyPattern := strings.Replace(RedisKeyNodeApp, "%s:%s", "*", -1)
+	for {
+		keys, nextCursor, err := r.client.Scan(ctx, cursor, nodeAppKeyPattern, 100).Result()
+		if err != nil {
+			fmt.Println("Error scanning keys:", err)
+			break
+		}
+
+		for _, key := range keys {
+			res := r.client.HGetAll(ctx, key)
+			if res.Err() != nil {
+				// return nil, res.Err()
+				log.Printf("Error HGetAll: %v", res.Err())
+				continue
+			}
+
+			var n NodeAppExtra
+			if err := res.Scan(&n); err != nil {
+				// return nil, err
+				log.Printf("Error scan node: %v", err)
+				continue
+			}
+
+			//titan:agent:nodeApp:%s:%s
+			n.NodeID = strings.Split(key, ":")[3]
+
+			if n.LastActivityTime.After(lastActiveTime) {
+				ret = append(ret, &n)
+			}
+
+		}
+
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return ret, nil
 }

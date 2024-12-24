@@ -112,7 +112,9 @@ func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 	baseInfo.availableMemory = int64(v.Available)
 
 	baseboard, _ := ghw.Baseboard()
-	baseInfo.baseboard = fmt.Sprintf("Vendor:%s,Product:%s", baseboard.Vendor, baseboard.Product)
+	if baseboard != nil {
+		baseInfo.baseboard = fmt.Sprintf("Vendor:%s,Product:%s", baseboard.Vendor, baseboard.Product)
+	}
 
 	baseInfo.getAndroidID()
 	baseInfo.getUUID()

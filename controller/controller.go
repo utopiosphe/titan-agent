@@ -2,13 +2,18 @@ package controller
 
 import (
 	"agent/agent"
+	titanrsa "agent/common/rsa"
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/md5"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"time"
@@ -29,6 +34,9 @@ type ConrollerArgs struct {
 	RelAppsDir           string
 	AppConfigsFileName   string
 	Channel              string
+
+	WebServerUrl string
+	KEY          string
 }
 
 type App struct {
@@ -49,11 +57,21 @@ type Controller struct {
 	apps          map[string]*App
 	metricCh      chan AppMetric
 	appMetrics    map[string]string
+
+	//
+	Config *Config
+	token  string
+	// client *http.Client
 }
 
 func New(args *ConrollerArgs) (*Controller, error) {
+	config, err := InitConfig(args.WorkingDir)
+	if err != nil {
+		return nil, err
+	}
+
 	appsDir := path.Join(args.WorkingDir, args.RelAppsDir)
-	err := os.MkdirAll(appsDir, os.ModePerm)
+	err = os.MkdirAll(appsDir, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -74,8 +92,156 @@ func New(args *ConrollerArgs) (*Controller, error) {
 		baseInfo:   info,
 		appMetrics: make(map[string]string),
 		metricCh:   make(chan AppMetric, 64),
+		Config:     config,
 	}
+
+	if err := c.regist(context.Background()); err != nil {
+		return nil, fmt.Errorf("[Regist error] %s", err.Error())
+	}
+	log.Info("Node regist success")
+
+	token, err := c.login(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("[Login error] %s", err.Error())
+	}
+	log.Info("Node login success")
+	c.token = token
+
+	// if err := c.registBindInfo(context.Background()); err != nil {
+	// 	return nil, fmt.Errorf("[Bind Error]: %s", err.Error())
+	// }
+	// log.Info("Node bind success")
+
 	return c, nil
+}
+
+func (c *Controller) registBindInfo(ctx context.Context) error {
+	titanRsa := titanrsa.New(crypto.SHA256, crypto.SHA256.New())
+	sign, err := titanRsa.Sign(c.Config.PrivateKey, []byte(c.args.KEY))
+	if err != nil {
+		return fmt.Errorf("failed to sign key: %s", err.Error())
+	}
+
+	type BindReq struct {
+		Key    string `json:"key"`
+		NodeID string `json:"nodeID"`
+		Sign   string `json:"sign"`
+	}
+
+	bindReq := BindReq{
+		Key:    c.args.KEY,
+		NodeID: c.Config.AgentID,
+		Sign:   hex.EncodeToString(sign),
+	}
+
+	buf, err := json.Marshal(bindReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal bind request: %s", err.Error())
+	}
+	resp, err := http.Post(c.args.WebServerUrl, "application/json", bytes.NewReader(buf))
+	if err != nil {
+		return fmt.Errorf("failed to post bind req to web-server: %s", err.Error())
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		buf, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %s", err.Error())
+		}
+		return fmt.Errorf("bind failed, status code %d, response body: %s", resp.StatusCode, string(buf))
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %s", err.Error())
+	}
+
+	type Resp struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	rsp := Resp{}
+	if err := json.Unmarshal(respBody, &rsp); err != nil {
+		return fmt.Errorf("failed to unmarshal response body: %s", err.Error())
+	}
+
+	if rsp.Code != 0 {
+		return fmt.Errorf("bind failed, code: %d, msg: %s", rsp.Code, rsp.Msg)
+	}
+	return nil
+}
+
+func (c *Controller) login(ctx context.Context) (string, error) {
+	rsa := titanrsa.New(crypto.SHA256, crypto.SHA256.New())
+	sign, err := rsa.Sign(c.Config.PrivateKey, []byte(c.Config.AgentID))
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("%s%s?node_id=%s&sign=%s", c.args.ServerURL, "/node/login", c.Config.AgentID, hex.EncodeToString(sign))
+
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("regist status code: %d, msg: %s, url: %s", resp.StatusCode, string(body), url)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+
+}
+
+func (c *Controller) regist(ctx context.Context) error {
+
+	encodedPubKey := base64.URLEncoding.EncodeToString(titanrsa.PublicKey2Pem(&c.Config.PrivateKey.PublicKey))
+
+	url := fmt.Sprintf("%s%s?node_id=%s&pub_key=%s", c.args.ServerURL, "/node/regist", c.Config.AgentID, url.QueryEscape(encodedPubKey))
+
+	ctx, cancel := context.WithTimeout(ctx, httpTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("regist status code: %d, msg: %s, url: %s", resp.StatusCode, string(body), url)
+	}
+
+	_, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// log.Infof("Controller.regist body:%s", string(body))
+
+	return nil
+
 }
 
 func (c *Controller) Run(ctx context.Context) error {
@@ -144,6 +310,8 @@ func (c *Controller) handleMetric(ctx context.Context) {
 	}
 }
 
+// ./controller run --working-dir=./devctr --server-url=http://localhost:8080 --web-url=http://google.com --key=xxxxxx
+
 func (c *Controller) pushMetrics(metrics map[string]string) error {
 	// if len(metrics) == 0 {
 	// 	return nil
@@ -172,6 +340,8 @@ func (c *Controller) pushMetrics(metrics map[string]string) error {
 	if err != nil {
 		return err
 	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.token))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -413,6 +583,7 @@ func (c *Controller) getAppConfigsFromServer() ([]*AppConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.token))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
