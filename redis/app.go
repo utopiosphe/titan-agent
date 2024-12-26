@@ -39,8 +39,23 @@ func (m MetricString) GetClientID() string {
 	return metric.ClientID
 }
 
+func (m *MetricString) UnmarshalJSON(data []byte) error {
+	*m = MetricString(data)
+	return nil
+}
+
+func (m MetricString) MarshalJSON() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m MetricString) MarshalBinary() ([]byte, error) {
+	return []byte(m), nil
+}
+
 type NodeAppBaseMetrics struct {
-	ClientID string // third-party unique id
+	ClientID string `json:"client_id"` // third-party unique id
+	Status   string `json:"status"`
+	Err      string `json:"err"`
 }
 
 func (redis *Redis) SetApp(ctx context.Context, app *App) error {
@@ -147,7 +162,8 @@ func (redis *Redis) SetNodeApp(ctx context.Context, nodeID string, nApp *NodeApp
 
 func (redis *Redis) SetNodeApps(ctx context.Context, nodeID string, nodeApps []*NodeApp) error {
 	if len(nodeID) == 0 {
-		return fmt.Errorf("Redis.SetNodeApp: node id can not empty")
+		log.Printf("Redis.SetNodeApp: node id can not empty")
+		return nil
 	}
 
 	pipe := redis.client.Pipeline()
@@ -223,11 +239,13 @@ func (redis *Redis) GetNodeApps(ctx context.Context, nodeID string, appNames []s
 
 func (redis *Redis) AddNodeAppsToList(ctx context.Context, nodeID string, appNames []string) error {
 	if len(nodeID) == 0 {
-		return fmt.Errorf("Redis.AddNodeApps: node id can not empty")
+		// return fmt.Errorf("Redis.AddNodeApps: node id can not empty")
+		return nil
 	}
 
 	if len(appNames) == 0 {
-		return fmt.Errorf("Redis.AddNodeApps: node apps name can not empty")
+		// return fmt.Errorf("Redis.AddNodeApps: node apps name can not empty")
+		return nil
 	}
 
 	key := fmt.Sprintf(RedisKeyNodeAppList, nodeID)
@@ -241,11 +259,13 @@ func (redis *Redis) AddNodeAppsToList(ctx context.Context, nodeID string, appNam
 
 func (redis *Redis) DeleteNodeApps(ctx context.Context, nodeID string, appNames []string) error {
 	if len(nodeID) == 0 {
-		return fmt.Errorf("Redis.DeleteNodeApp: node id can not empty")
+		log.Println("Redis.DeleteNodeApp: node id can not empty")
+		return nil
 	}
 
 	if len(appNames) == 0 {
-		return fmt.Errorf("Redis.DeleteNodeApp: node apps name can not empty")
+		log.Println("Redis.DeleteNodeApp: node apps name can not empty")
+		return nil
 	}
 
 	pipe := redis.client.Pipeline()
@@ -281,7 +301,7 @@ func (redis *Redis) GetNodeAppList(ctx context.Context, nodeID string) ([]string
 }
 
 type NodeAppExtra struct {
-	*NodeApp
+	NodeApp
 	NodeID string
 }
 
@@ -309,7 +329,7 @@ func (r *Redis) GetAllAppInfos(ctx context.Context, lastActiveTime time.Time) ([
 			}
 
 			var n NodeAppExtra
-			if err := res.Scan(&n); err != nil {
+			if err := res.Scan(&n.NodeApp); err != nil {
 				// return nil, err
 				log.Printf("Error scan node: %v", err)
 				continue
@@ -317,6 +337,8 @@ func (r *Redis) GetAllAppInfos(ctx context.Context, lastActiveTime time.Time) ([
 
 			//titan:agent:nodeApp:%s:%s
 			n.NodeID = strings.Split(key, ":")[3]
+
+			fmt.Println(n)
 
 			if n.LastActivityTime.After(lastActiveTime) {
 				ret = append(ret, &n)

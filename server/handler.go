@@ -60,8 +60,43 @@ func (a *auth) proxy(next http.HandlerFunc) http.HandlerFunc {
 
 		r = r.WithContext(context.WithValue(r.Context(), "payload", payload))
 
+		// curlCmd, err := RequestToCurl(r)
+		// if err == nil {
+		// 	log.Infof("RequestToCurl: %s", curlCmd)
+		// }
+
 		next(w, r)
 	}
+}
+
+func RequestToCurl(req *http.Request) (string, error) {
+	var curlCmd strings.Builder
+
+	curlCmd.WriteString("curl -X ")
+	curlCmd.WriteString(req.Method)
+
+	for key, values := range req.Header {
+		for _, value := range values {
+			curlCmd.WriteString(fmt.Sprintf(" -H '%s: %s'", key, value))
+		}
+	}
+
+	if req.Body != nil {
+		bodyBytes, err := io.ReadAll(req.Body)
+		if err != nil {
+			return "", fmt.Errorf("failed to read request body: %w", err)
+		}
+
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+		if len(bodyBytes) > 0 {
+			curlCmd.WriteString(fmt.Sprintf(" -d '%s'", string(bodyBytes)))
+		}
+	}
+
+	curlCmd.WriteString(fmt.Sprintf(" '%s'", req.URL.String()))
+
+	return curlCmd.String(), nil
 }
 
 func parseTokenFromRequestContext(ctx context.Context) (*common.JwtPayload, error) {
@@ -171,7 +206,6 @@ func (h *ServerHandler) handleGetControllerConfig(w http.ResponseWriter, r *http
 
 func (h *ServerHandler) handleGetAppsConfig(w http.ResponseWriter, r *http.Request) {
 	log.Debugf("handleGetAppsConfig, queryString %s\n", r.URL.RawQuery)
-
 	payload, err := parseTokenFromRequestContext(r.Context())
 	if err != nil {
 		resultError(w, http.StatusUnauthorized, err.Error())
@@ -194,6 +228,7 @@ func (h *ServerHandler) handleGetAppsConfig(w http.ResponseWriter, r *http.Reque
 	}
 
 	appList := make([]*AppConfig, 0, len(h.config.AppList))
+
 	for _, app := range h.config.AppList {
 		if len(testApps) > 0 {
 			if h.isTestApp(app.AppName, testApps) {
@@ -212,6 +247,17 @@ func (h *ServerHandler) handleGetAppsConfig(w http.ResponseWriter, r *http.Reque
 
 	if len(appList) == 0 {
 		log.Infof("ServerHandler.handleGetAppsConfig len(appList) == 0, uuid:%s, os:%s", r.URL.Query().Get("uuid"), r.URL.Query().Get("os"))
+	}
+
+	var appNames []string
+	for _, app := range appList {
+		appNames = append(appNames, app.AppName)
+	}
+
+	if err := h.redis.AddNodeAppsToList(context.Background(), payload.NodeID, appNames); err != nil {
+		log.Errorf("ServerHandler.handleGetAppsConfig AddNodeAppsToList: %v", err)
+		resultError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	buf, err := json.Marshal(appList)
@@ -441,6 +487,7 @@ type NodeAppWebInfo struct {
 	AppName          string
 	Channel          string
 	ClientID         string
+	Tag              string
 }
 
 func (h *ServerHandler) handleGetAllNodesAppInfosList(w http.ResponseWriter, r *http.Request) {
@@ -463,6 +510,11 @@ func (h *ServerHandler) handleGetAllNodesAppInfosList(w http.ResponseWriter, r *
 		}
 	}
 
+	tagRefMap := make(map[string]string)
+	for _, app := range h.config.AppList {
+		tagRefMap[app.AppName] = app.Tag
+	}
+
 	var ret []*NodeAppWebInfo = make([]*NodeAppWebInfo, len(nodeApps))
 
 	for i, nodeApp := range nodeApps {
@@ -472,6 +524,7 @@ func (h *ServerHandler) handleGetAllNodesAppInfosList(w http.ResponseWriter, r *
 			NodeID:           nodeApp.NodeID,
 			Channel:          channelRefMap[nodeApp.AppName],
 			ClientID:         nodeApp.Metric.GetClientID(),
+			Tag:              tagRefMap[nodeApp.AppName],
 		}
 	}
 
@@ -807,7 +860,7 @@ func (h *ServerHandler) HandleNodeKeepalive(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := h.redis.IncrNodeOnlineDuration(context.Background(), payload.NodeID, int(offlineTime)); err != nil {
+	if err := h.redis.IncrNodeOnlineDuration(context.Background(), payload.NodeID, int(offlineTime.Minutes())); err != nil {
 		resultError(w, http.StatusBadRequest, err.Error())
 		return
 	}

@@ -27,6 +27,7 @@ type AgentArguments struct {
 
 	ServerURL string
 	Channel   string
+	Key       string
 }
 
 type Agent struct {
@@ -54,6 +55,7 @@ func New(args *AgentArguments) (*Agent, error) {
 		ScriptFileName:  args.ScriptFileName,
 		ScriptInvterval: args.ScriptInvterval,
 		Channel:         args.Channel,
+		ControllerKey:   args.Key,
 	}
 	agent := &Agent{
 		agentVersion: version,
@@ -171,7 +173,7 @@ func (a *Agent) loadLocal() {
 func (a *Agent) getUpdateConfigFromServer() (*UpdateConfig, error) {
 	devInfoQuery := a.baseInfo.ToURLQuery()
 
-	url := fmt.Sprintf("%s?%s", a.args.ServerURL, devInfoQuery.Encode())
+	url := fmt.Sprintf("%s/update/lua?%s", a.args.ServerURL, devInfoQuery.Encode())
 
 	ctx, cancel := context.WithTimeout(context.Background(), httpTimeout)
 	defer cancel()

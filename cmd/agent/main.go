@@ -48,6 +48,11 @@ func main() {
 				Usage: "--channel titan-l1, channel: titan-l1,painet,emc-titan-l2",
 				Value: "titan-l1",
 			},
+			&cli.StringFlag{
+				Name:  "key",
+				Usage: "--key YOUR_WEB_KEY",
+				Value: "",
+			},
 		},
 		Before: func(cctx *cli.Context) error {
 			return nil
@@ -60,6 +65,7 @@ func main() {
 				ScriptInvterval: cctx.Int("script-interval"),
 				ServerURL:       cctx.String("server-url"),
 				Channel:         cctx.String("channel"),
+				Key:             cctx.String("key"),
 			}
 
 			agent, err := agent.New(agrs)

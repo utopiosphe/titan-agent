@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/url"
 	"os/exec"
 	"runtime"
@@ -28,6 +29,7 @@ type AgentInfo struct {
 	ScriptFileName  string
 	ScriptInvterval int
 	Channel         string
+	ControllerKey   string
 }
 
 // Used by controller
@@ -76,16 +78,21 @@ type BaseInfo struct {
 }
 
 func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
-	info, _ := host.Info()
+	info, err := host.Info()
+	if err != nil {
+		log.Printf("Get host info failed: %v", err)
+	}
 
 	baseInfo := &BaseInfo{agentInfo: agentInfo, appInfo: appInfo}
 	// host info
-	baseInfo.hostName = info.Hostname
-	baseInfo.os = info.OS
-	baseInfo.platform = info.Platform
-	baseInfo.platformVersion = info.PlatformVersion
-	baseInfo.bootTime = int64(info.BootTime)
-	baseInfo.arch = info.KernelArch
+	if info != nil {
+		baseInfo.hostName = info.Hostname
+		baseInfo.os = info.OS
+		baseInfo.platform = info.Platform
+		baseInfo.platformVersion = info.PlatformVersion
+		baseInfo.bootTime = int64(info.BootTime)
+		baseInfo.arch = info.KernelArch
+	}
 
 	var macs = ""
 	interfaces, _ := net.Interfaces()
@@ -352,6 +359,7 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 		t.RawSet(lua.LString("scriptFileName"), lua.LString(baseInfo.agentInfo.ScriptFileName))
 		t.RawSet(lua.LString("scriptInvterval"), lua.LNumber(baseInfo.agentInfo.ScriptInvterval))
 		t.RawSet(lua.LString("channel"), lua.LString(baseInfo.agentInfo.Channel))
+		t.RawSet(lua.LString("key"), lua.LString(baseInfo.agentInfo.ControllerKey))
 	}
 
 	if baseInfo.appInfo != nil {
@@ -363,6 +371,7 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 		t.RawSet(lua.LString("appDir"), lua.LString(baseInfo.appInfo.AppDir))
 		t.RawSet(lua.LString("channel"), lua.LString(baseInfo.appInfo.Channel))
 	}
+
 	return t
 }
 
