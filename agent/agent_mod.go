@@ -378,7 +378,7 @@ func (am *AgentModule) exec(L *lua.LState) int {
 
 	var cmd *exec.Cmd
 
-	cmd.Env = append(os.Environ(), "PATH="+os.Getenv("PATH"))
+	// cmd.Env = append(os.Environ(), "PATH="+os.Getenv("PATH"))
 
 	if len(newArgs) > 1 {
 		cmd = exec.Command(newArgs[0], newArgs[1:]...)
