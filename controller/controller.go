@@ -107,10 +107,10 @@ func New(args *ConrollerArgs) (*Controller, error) {
 	log.Info("Node login success")
 	c.token = token
 
-	// if err := c.registBindInfo(context.Background()); err != nil {
-	// 	return nil, fmt.Errorf("[Bind Error]: %s", err.Error())
-	// }
-	// log.Info("Node bind success")
+	if err := c.registBindInfo(context.Background()); err != nil {
+		return nil, fmt.Errorf("[Bind Error]: %s", err.Error())
+	}
+	log.Info("Node bind success")
 
 	return c, nil
 }
