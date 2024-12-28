@@ -168,7 +168,7 @@ func (dm *DevMgr) updateController(c *Controller) {
 	}
 
 	controller.LastActivityTime = c.LastActivityTime
-	dm.redis.IncrNodeOnlineDuration(context.Background(), controller.NodeID, int(offlineTime))
+	dm.redis.IncrNodeOnlineDuration(context.Background(), controller.NodeID, int(offlineTime.Minutes()))
 }
 
 func controllerToNode(c *Controller) *redis.Node {
