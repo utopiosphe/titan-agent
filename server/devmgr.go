@@ -12,7 +12,7 @@ import (
 
 const (
 	keepaliveInterval = 30 * time.Second
-	offlineTime       = 120 * time.Second
+	offlineTime       = 300 * time.Second
 )
 
 type Controller struct {
@@ -157,18 +157,27 @@ func (dm *DevMgr) getControllers() []*Controller {
 
 func (dm *DevMgr) updateController(c *Controller) {
 	if len(c.NodeID) == 0 {
+		log.Errorf("updateController empty nodeID")
 		return
 	}
 
+	log.Info("set controller ", c.NodeID)
 	controller := dm.getController(c.NodeID)
 	if controller == nil {
 		dm.addController(c)
-		dm.redis.SetNode(context.Background(), controllerToNode(c))
 		return
 	}
 
-	controller.LastActivityTime = c.LastActivityTime
-	dm.redis.IncrNodeOnlineDuration(context.Background(), controller.NodeID, int(offlineTime.Minutes()))
+	cNode := controllerToNode(c)
+	if err := dm.redis.SetNode(context.Background(), cNode); err != nil {
+		log.Errorf("updateController redis.SetNode error: %v", err)
+	}
+
+	if err := dm.redis.IncrNodeOnlineDuration(context.Background(), controller.NodeID, int(cNode.LastActivityTime.Sub(controller.LastActivityTime).Seconds())); err != nil {
+		log.Errorf("updateController redis.IncrNodeOnlineDuration error: %v", err)
+	}
+
+	controller.LastActivityTime = cNode.LastActivityTime
 }
 
 func controllerToNode(c *Controller) *redis.Node {

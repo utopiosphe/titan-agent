@@ -120,7 +120,7 @@ func (h *ServerHandler) handleGetLuaConfig(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *ServerHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) {
-	log.Debugf("handleLuaUpdate, queryString %s\n", r.URL.RawQuery)
+	log.Infof("handleLuaUpdate, queryString %s\n", r.URL.RawQuery)
 
 	d := NewDeviceFromURLQuery(r.URL.Query())
 	if d != nil {
@@ -166,7 +166,7 @@ func (h *ServerHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ServerHandler) handleGetControllerConfig(w http.ResponseWriter, r *http.Request) {
-	log.Debugf("handleGetControllerConfig, queryString %s\n", r.URL.RawQuery)
+	log.Infof("handleGetControllerConfig, queryString %s\n", r.URL.RawQuery)
 	// version := r.URL.Query().Get("version")
 	os := r.URL.Query().Get("os")
 	uuid := r.URL.Query().Get("uuid")
@@ -205,18 +205,17 @@ func (h *ServerHandler) handleGetControllerConfig(w http.ResponseWriter, r *http
 }
 
 func (h *ServerHandler) handleGetAppsConfig(w http.ResponseWriter, r *http.Request) {
-	log.Debugf("handleGetAppsConfig, queryString %s\n", r.URL.RawQuery)
+	log.Infof("handleGetAppsConfig, queryString %s\n", r.URL.RawQuery)
 	payload, err := parseTokenFromRequestContext(r.Context())
 	if err != nil {
+		log.Infof("ServerHandler.handleGetAppsConfig parseTokenFromRequestContext: %v", err)
 		resultError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	d := NewDeviceFromURLQuery(r.URL.Query())
-	if d != nil {
-		d.IP = getReadIP(r)
-		h.devMgr.updateController(&Controller{Device: *d, NodeID: payload.NodeID})
-	}
+	d.IP = getReadIP(r)
+	h.devMgr.updateController(&Controller{Device: *d, NodeID: payload.NodeID})
 
 	uuid := r.URL.Query().Get("uuid")
 	channel := r.URL.Query().Get("channel")
@@ -244,6 +243,8 @@ func (h *ServerHandler) handleGetAppsConfig(w http.ResponseWriter, r *http.Reque
 			appList = append(appList, app)
 		}
 	}
+
+	log.Infof("GetAppList node: %s, os: %s, channel: %s, apps: %v", payload.NodeID, r.URL.Query().Get("os"), channel, appList)
 
 	if len(appList) == 0 {
 		log.Infof("ServerHandler.handleGetAppsConfig len(appList) == 0, uuid:%s, os:%s", r.URL.Query().Get("uuid"), r.URL.Query().Get("os"))
@@ -304,7 +305,7 @@ func (h *ServerHandler) isAppMatchChannel(appName string, channel string) bool {
 		return false
 	}
 
-	log.Info("isAppMatchChannel apps", apps, "current app", appName)
+	// log.Info("isAppMatchChannel apps", apps, "current app", appName)
 	for _, app := range apps {
 		if appName == app {
 			return true
@@ -315,7 +316,7 @@ func (h *ServerHandler) isAppMatchChannel(appName string, channel string) bool {
 }
 
 func (h *ServerHandler) handleAgentList(w http.ResponseWriter, r *http.Request) {
-	log.Debugf("handleAgentList, queryString %s\n", r.URL.RawQuery)
+	log.Infof("handleAgentList, queryString %s\n", r.URL.RawQuery)
 
 	agents := h.devMgr.getAgents()
 
@@ -338,7 +339,7 @@ func (h *ServerHandler) handleAgentList(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *ServerHandler) handleControllerList(w http.ResponseWriter, r *http.Request) {
-	log.Debugf("handleControllerList, queryString %s\n", r.URL.RawQuery)
+	log.Infof("handleControllerList, queryString %s\n", r.URL.RawQuery)
 
 	controllers := h.devMgr.getControllers()
 
@@ -460,9 +461,9 @@ func (h *ServerHandler) handleGetNodeList(w http.ResponseWriter, r *http.Request
 	for i, node := range nodes {
 		ret[i] = &NodeWebInfo{Node: node}
 		if time.Since(node.LastActivityTime) > offlineTime {
-			ret[i].State = NodeStateOnline
-		} else {
 			ret[i].State = NodeStateOffline
+		} else {
+			ret[i].State = NodeStateOnline
 		}
 		ret[i].OnlineDuration, _ = h.redis.GetNodeOnlineDuration(r.Context(), node.ID)
 	}

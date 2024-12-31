@@ -338,7 +338,7 @@ func (r *Redis) GetAllAppInfos(ctx context.Context, lastActiveTime time.Time) ([
 			//titan:agent:nodeApp:%s:%s
 			n.NodeID = strings.Split(key, ":")[3]
 
-			fmt.Println(n)
+			// fmt.Println(n)
 
 			if n.LastActivityTime.After(lastActiveTime) {
 				ret = append(ret, &n)
