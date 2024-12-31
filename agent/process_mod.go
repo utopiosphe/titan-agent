@@ -59,6 +59,7 @@ func (pm *ProcessModule) createProcessStub(L *lua.LState) int {
 	envStr := L.ToString(3)
 
 	log.Infof("createProcessStub name:%s", name)
+	// log.Infof("createProcessStub command:%s\n, envStr:%s", command, envStr)
 
 	if len(name) < 1 {
 		L.Push(lua.LString("Must set process name"))
@@ -197,7 +198,9 @@ func (tm *ProcessModule) createProcess(command string, env []string) (*exec.Cmd,
 		cmd = exec.Command(newArgs[0])
 	}
 
-	cmd.Env = env
+	parentEnv := os.Environ()
+	cmd.Env = append(parentEnv, env...)
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
