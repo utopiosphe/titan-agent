@@ -19,6 +19,7 @@ import (
 	"github.com/shirou/gopsutil/v3/mem"
 	"github.com/shirou/gopsutil/v3/net"
 	lua "github.com/yuin/gopher-lua"
+	"golang.org/x/exp/constraints"
 )
 
 // Used by agent
@@ -57,13 +58,19 @@ type BaseInfo struct {
 
 	macs string
 
-	cpuModuleName   string
-	cpuCores        int
-	cpuMhz          float64
+	cpuModuleName string
+	cpuCores      int
+	cpuMhz        float64
+	cpuUsage      float64
+
+	gpu string
+
 	totalMemory     int64
 	usedMemory      int64
 	availableMemory int64
-	baseboard       string
+	memoryModel     string
+
+	baseboard string
 
 	uuid                string
 	androidID           string
@@ -71,6 +78,7 @@ type BaseInfo struct {
 
 	totalDisk int64
 	freeDisk  int64
+	diskModel string
 
 	agentInfo *AgentInfo
 
@@ -80,7 +88,7 @@ type BaseInfo struct {
 func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 	info, err := host.Info()
 	if err != nil {
-		log.Printf("Get host info failed: %v", err)
+		log.Fatalf("Get host info failed: %v", err)
 	}
 
 	baseInfo := &BaseInfo{agentInfo: agentInfo, appInfo: appInfo}
@@ -110,13 +118,40 @@ func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 		if baseInfo.cpuCores == 1 {
 			baseInfo.cpuCores = len(cpuInfo)
 		}
+		usages, _ := cpu.Percent(time.Minute, false)
+		baseInfo.cpuUsage = calAvg(usages)
+	}
+
+	// gpu
+	gpuInfo, _ := ghw.GPU()
+	if gpuInfo != nil && len(gpuInfo.GraphicsCards) > 0 {
+		last := gpuInfo.GraphicsCards[len(gpuInfo.GraphicsCards)-1]
+		baseInfo.gpu = fmt.Sprintf("%s, %s", last.DeviceInfo.Vendor.ID, last.DeviceInfo.Product.Name)
 	}
 
 	// memory info
-	v, _ := mem.VirtualMemory()
-	baseInfo.totalMemory = int64(v.Total)
-	baseInfo.usedMemory = int64(v.Used)
-	baseInfo.availableMemory = int64(v.Available)
+	memory, _ := mem.VirtualMemory()
+	if memory != nil {
+		baseInfo.totalMemory = int64(memory.Total)
+		baseInfo.usedMemory = int64(memory.Used)
+		baseInfo.availableMemory = int64(memory.Available)
+	}
+
+	// ram info
+	m, _ := ghw.Memory()
+	if m != nil && len(m.Modules) > 0 {
+		baseInfo.memoryModel = m.Modules[0].Vendor
+	}
+
+	// blk info
+	blk, _ := ghw.Block()
+	if blk != nil && len(blk.Disks) > 0 {
+		var disks []string
+		for _, d := range blk.Disks {
+			disks = append(disks, d.Model)
+		}
+		baseInfo.diskModel = strings.Join(disks, ", ")
+	}
 
 	baseboard, _ := ghw.Baseboard()
 	if baseboard != nil {
@@ -295,10 +330,13 @@ func (baseInfo *BaseInfo) ToURLQuery() url.Values {
 	query.Add("cpuModuleName", baseInfo.cpuModuleName)
 	query.Add("cpuCores", fmt.Sprintf("%d", baseInfo.cpuCores))
 	query.Add("cpuMhz", fmt.Sprintf("%f", baseInfo.cpuMhz))
+	query.Add("cpuUsage", fmt.Sprintf("%f", baseInfo.cpuUsage))
+	query.Add("gpu", baseInfo.gpu)
 
 	query.Add("totalmemory", fmt.Sprintf("%d", baseInfo.totalMemory))
 	query.Add("usedMemory", fmt.Sprintf("%d", baseInfo.usedMemory))
 	query.Add("availableMemory", fmt.Sprintf("%d", baseInfo.availableMemory))
+	query.Add("memoryModel", baseInfo.memoryModel)
 
 	query.Add("baseboard", baseInfo.baseboard)
 
@@ -308,6 +346,7 @@ func (baseInfo *BaseInfo) ToURLQuery() url.Values {
 
 	query.Add("totalDisk", fmt.Sprintf("%d", baseInfo.totalDisk))
 	query.Add("freeDisk", fmt.Sprintf("%d", baseInfo.freeDisk))
+	query.Add("diskModel", baseInfo.diskModel)
 
 	if baseInfo.agentInfo != nil {
 		query.Add("version", baseInfo.agentInfo.Version)
@@ -377,4 +416,15 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 
 func (baseInfo *BaseInfo) UUID() string {
 	return baseInfo.uuid
+}
+
+func calAvg[T constraints.Integer | constraints.Float](arr []T) float64 {
+	if len(arr) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, v := range arr {
+		sum += float64(v)
+	}
+	return sum / float64(len(arr))
 }
