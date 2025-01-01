@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"runtime"
@@ -20,7 +21,7 @@ type NetworkStatsRate struct {
 	ORate float64 // Bytes per second sent
 }
 
-func MonitorNetworkStats(interval time.Duration, stopChan <-chan struct{}) (<-chan NetworkStatsRate, error) {
+func MonitorNetworkStats(ctx context.Context, interval time.Duration) (<-chan NetworkStatsRate, error) {
 	outputChan := make(chan NetworkStatsRate)
 
 	go func() {
@@ -57,7 +58,7 @@ func MonitorNetworkStats(interval time.Duration, stopChan <-chan struct{}) (<-ch
 
 				previousStats = currentStats
 
-			case <-stopChan:
+			case <-ctx.Done():
 				return
 			}
 		}

@@ -22,13 +22,19 @@ type Device struct {
 	CPUModuleName string
 	CPUCores      int
 	CPUMhz        float64
+	Gpu           string
 
 	TotalMemory     int64
 	UsedMemory      int64
 	AvailableMemory int64
+	MemoryModel     string
 
 	TotalDisk int64
 	FreeDisk  int64
+	DiskModel string
+
+	NetIRate float64
+	NetORate float64
 
 	Baseboard string
 
@@ -61,13 +67,19 @@ func NewDeviceFromURLQuery(values url.Values) *Device {
 	d.CPUModuleName = values.Get("cpuModuleName")
 	d.CPUCores = stringToInt(values.Get("cpuCores"))
 	d.CPUMhz = stringToFloat64(values.Get("cpuMhz"))
+	d.Gpu = values.Get("gpu")
 
 	d.TotalMemory = stringToInt64(values.Get("totalmemory"))
 	d.UsedMemory = stringToInt64(values.Get("usedMemory"))
 	d.AvailableMemory = stringToInt64(values.Get("availableMemory"))
+	d.MemoryModel = values.Get("memoryModel")
 
 	d.TotalDisk = stringToInt64(values.Get("totalDisk"))
 	d.FreeDisk = stringToInt64(values.Get("freeDisk"))
+	d.DiskModel = values.Get("diskModel")
+
+	d.NetIRate = stringToFloat64(values.Get("netIRate"))
+	d.NetORate = stringToFloat64(values.Get("netORate"))
 
 	d.Baseboard = values.Get("baseboard")
 

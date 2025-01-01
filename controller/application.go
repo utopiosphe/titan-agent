@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -76,6 +77,8 @@ func (app *Application) Stop() {
 func (app *Application) Run() error {
 	loop := true
 
+	go app.collectTraffic()
+
 	for loop {
 		script := app.currentScript()
 		select {
@@ -131,4 +134,21 @@ func (app *Application) loadScript() error {
 	app.scriptFileMD5 = fmt.Sprintf("%x", md5.Sum(b))
 
 	return nil
+}
+
+func (app *Application) collectTraffic() {
+	statsChan, err := agent.MonitorNetworkStats(app.ctx, 1*time.Minute)
+	if err != nil {
+		log.Errorf("collect network stats error: %v", err)
+		return
+	}
+
+	for {
+		select {
+		case <-app.ctx.Done():
+			return
+		case stats := <-statsChan:
+			app.baseInfo.SetTraffice(stats)
+		}
+	}
 }

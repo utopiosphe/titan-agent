@@ -70,6 +70,9 @@ type BaseInfo struct {
 	availableMemory int64
 	memoryModel     string
 
+	netIRate float64
+	netORate float64
+
 	baseboard string
 
 	uuid                string
@@ -338,6 +341,9 @@ func (baseInfo *BaseInfo) ToURLQuery() url.Values {
 	query.Add("availableMemory", fmt.Sprintf("%d", baseInfo.availableMemory))
 	query.Add("memoryModel", baseInfo.memoryModel)
 
+	query.Add("netIRate", fmt.Sprintf("%f", baseInfo.netIRate))
+	query.Add("netORate", fmt.Sprintf("%f", baseInfo.netORate))
+
 	query.Add("baseboard", baseInfo.baseboard)
 
 	query.Add("uuid", baseInfo.uuid)
@@ -382,6 +388,9 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 	t.RawSet(lua.LString("usedMemory"), lua.LNumber(baseInfo.usedMemory))
 	t.RawSet(lua.LString("availableMemory"), lua.LNumber(baseInfo.availableMemory))
 
+	t.RawSet(lua.LString("netIRate"), lua.LNumber(baseInfo.netIRate))
+	t.RawSet(lua.LString("netORate"), lua.LNumber(baseInfo.netORate))
+
 	t.RawSet(lua.LString("baseboard"), lua.LString(baseInfo.baseboard))
 
 	t.RawSet(lua.LString("uuid"), lua.LString(baseInfo.uuid))
@@ -416,6 +425,11 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 
 func (baseInfo *BaseInfo) UUID() string {
 	return baseInfo.uuid
+}
+
+func (baseInfo *BaseInfo) SetTraffice(n NetworkStatsRate) {
+	baseInfo.netIRate = n.IRate
+	baseInfo.netORate = n.ORate
 }
 
 func calAvg[T constraints.Integer | constraints.Float](arr []T) float64 {
