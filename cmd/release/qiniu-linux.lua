@@ -1,7 +1,7 @@
-local mod = {luaScriptName="airship-unix.lua"}
+local mod = {luaScriptName="qiniu-unix.lua"}
 
 function mod.start()
-    mod.print("mod.start airship")
+    mod.print("mod.start qiniu")
     mod.timerInterval = 60
 
     mod.getBaseInfo()
@@ -19,7 +19,7 @@ function mod.start()
 end
 
 function mod.stop()
-    mod.print("mod.stop airship")
+    mod.print("mod.stop qiniu")
     local err = mod.stopInstance()
     if err then
         mod.print("Failed to stop instance: "..err)
@@ -247,8 +247,8 @@ end
 
 
 function mod.fetchInstallScript()
-    local scriptName = "install-airship.sh"
-    local scriptURL = "https://www-test-api.titannet.io/install-airship.sh"
+    local scriptName = "install-qiniu.sh"
+    local scriptURL = "https://www-test-api.titannet.io/install-qiniu.sh"
     local scriptPath = mod.info.appDir .. "/" .. scriptName
     local err = mod.downloadScript(scriptURL, scriptPath)
     if err then
@@ -336,7 +336,7 @@ end
 
 
 function mod.onTimerMonitor()
-    mod.print("onTimerMonitor airship.lua")
+    mod.print("onTimerMonitor qiniu.lua")
 
     if mod.monitorLastActivitTime then
         if os.difftime(os.time(), mod.monitorLastActivitTime) < mod.timerInterval then

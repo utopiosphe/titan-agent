@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -33,6 +34,8 @@ func InitConfig(workDir string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load AgentID: %w", err)
 	}
+
+	log.Infof("AgentID: %s", ret.AgentID)
 
 	ret.PrivateKey, err = loadPrivateKey(workDir)
 	if err != nil {

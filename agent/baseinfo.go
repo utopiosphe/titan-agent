@@ -121,8 +121,6 @@ func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 		if baseInfo.cpuCores == 1 {
 			baseInfo.cpuCores = len(cpuInfo)
 		}
-		usages, _ := cpu.Percent(time.Minute, false)
-		baseInfo.cpuUsage = calAvg(usages)
 	}
 
 	// gpu
@@ -430,6 +428,10 @@ func (baseInfo *BaseInfo) UUID() string {
 func (baseInfo *BaseInfo) SetTraffice(n NetworkStatsRate) {
 	baseInfo.netIRate = n.IRate
 	baseInfo.netORate = n.ORate
+}
+
+func (b *BaseInfo) SetCpuUsage(cpuUsage float64) {
+	b.cpuUsage = cpuUsage
 }
 
 func calAvg[T constraints.Integer | constraints.Float](arr []T) float64 {

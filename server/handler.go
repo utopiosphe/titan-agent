@@ -137,7 +137,7 @@ func (h *ServerHandler) handleLuaUpdate(w http.ResponseWriter, r *http.Request) 
 		testScripName = testNode.LuaScript
 	}
 
-	log.Printf("testNode %#v", testNode)
+	// log.Printf("testNode %#v", testNode)
 	var file *FileConfig = nil
 	for _, f := range h.config.LuaFileList {
 		if len(testScripName) > 0 {
@@ -672,8 +672,6 @@ func (h *ServerHandler) handlePushMetrics(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	log.Info("ServerHandler.handlePushMetrics ", string(b))
-
 	apps := make([]*App, 0)
 	err = json.Unmarshal(b, &apps)
 	if err != nil {
@@ -681,6 +679,8 @@ func (h *ServerHandler) handlePushMetrics(w http.ResponseWriter, r *http.Request
 		resultError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	log.Infof("[PushMetrics] NodeID:%s, apps: %v", payload.NodeID, apps)
 
 	if err := h.updateNodeApps(payload.NodeID, apps); err != nil {
 		log.Error("ServerHandler.handlePushMetrics update nodes app failed:", err.Error())

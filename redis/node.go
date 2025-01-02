@@ -25,13 +25,19 @@ type Node struct {
 	CPUModuleName string  `redis:"cpuModuleName"`
 	CPUCores      int     `redis:"cpuCores"`
 	CPUMhz        float64 `redis:"cpuMhz"`
+	Gpu           string  `redis:"gpu"`
 
-	TotalMemory     int64 `redis:"totalMemory"`
-	UsedMemory      int64 `redis:"usedMemory"`
-	AvailableMemory int64 `redis:"availableMemory"`
+	TotalMemory     int64  `redis:"totalMemory"`
+	UsedMemory      int64  `redis:"usedMemory"`
+	AvailableMemory int64  `redis:"availableMemory"`
+	MemoryModel     string `redis:"memoryModel"`
 
-	TotalDisk int64 `redis:"totalDisk"`
-	FreeDisk  int64 `redis:"freeDisk"`
+	TotalDisk int64  `redis:"totalDisk"`
+	FreeDisk  int64  `redis:"freeDisk"`
+	DiskModel string `redis:"diskModel"`
+
+	NetIRate float64 `redis:"netIRate"`
+	NetORate float64 `redis:"netORate"`
 
 	Baseboard string `redis:"baseboard"`
 

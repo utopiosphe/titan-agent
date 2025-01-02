@@ -146,9 +146,11 @@ func (app *Application) collectTraffic() {
 	for {
 		select {
 		case <-app.ctx.Done():
+			log.Info("collectTraffic quit")
 			return
 		case stats := <-statsChan:
 			app.baseInfo.SetTraffice(stats)
+			app.baseInfo.SetCpuUsage(agent.GetCpuRealtimeUsage())
 		}
 	}
 }

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/cpu"
 )
 
 type NetworkStats struct {
@@ -182,4 +184,9 @@ func parseWindowsOutput(output string) (NetworkStats, error) {
 	}
 
 	return totalStats, nil
+}
+
+func GetCpuRealtimeUsage() float64 {
+	usages, _ := cpu.Percent(time.Second, false)
+	return calAvg(usages)
 }
