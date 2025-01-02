@@ -150,7 +150,7 @@ var runCmd = &cli.Command{
 			os.Stdout = file
 		}
 
-		log.Println(logoWindow)
+		fmt.Print(logoWindow)
 
 		args := &controller.ConrollerArgs{
 			WorkingDir:           cctx.String("working-dir"),
@@ -205,10 +205,9 @@ const (
 ┃   ░█░   █   ░█░   █▀█   █░▀█         ┃
 ┃━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┃
 ┃           4th Galileo TestNet        ┃
-┃               Version 1.0.0          ┃
+┃               Version 0.1.1          ┃
 ╰━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╯
-
-	`
+`
 	MonitorWindow = `
 ╔════════════════════ TITAN NETWORK ════════════════════╗
 ║                                                       ║
