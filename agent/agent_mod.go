@@ -386,6 +386,9 @@ func (am *AgentModule) exec(L *lua.LState) int {
 		cmd = exec.Command(newArgs[0])
 	}
 
+	parentEnv := os.Environ()
+	cmd.Env = append(cmd.Env, parentEnv...)
+
 	stdout, stderr := bytes.Buffer{}, bytes.Buffer{}
 	cmd.Stderr = &stderr
 	cmd.Stdout = &stdout
@@ -442,6 +445,9 @@ func (am *AgentModule) runBashCmd(L *lua.LState) int {
 		L.Push(lua.LString(`unsupported os`))
 		return 2
 	}
+
+	parentEnv := os.Environ()
+	cmd.Env = append(cmd.Env, parentEnv...)
 
 	stdout, stderr := bytes.Buffer{}, bytes.Buffer{}
 	cmd.Stderr = &stderr
