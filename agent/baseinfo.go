@@ -332,6 +332,7 @@ func (baseInfo *BaseInfo) ToURLQuery() url.Values {
 	query.Add("cpuCores", fmt.Sprintf("%d", baseInfo.cpuCores))
 	query.Add("cpuMhz", fmt.Sprintf("%f", baseInfo.cpuMhz))
 	query.Add("cpuUsage", fmt.Sprintf("%f", baseInfo.cpuUsage))
+
 	query.Add("gpu", baseInfo.gpu)
 
 	query.Add("totalmemory", fmt.Sprintf("%d", baseInfo.totalMemory))
@@ -381,10 +382,14 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 	t.RawSet(lua.LString("cpuModuleName"), lua.LString(baseInfo.cpuModuleName))
 	t.RawSet(lua.LString("cpuCores"), lua.LNumber(baseInfo.cpuCores))
 	t.RawSet(lua.LString("cpuMhz"), lua.LNumber(baseInfo.cpuMhz))
+	t.RawSet(lua.LString("cpuUsage"), lua.LNumber(baseInfo.cpuUsage))
+
+	t.RawSet(lua.LString("gpu"), lua.LString(baseInfo.gpu))
 
 	t.RawSet(lua.LString("totalmemory"), lua.LNumber(baseInfo.totalMemory))
 	t.RawSet(lua.LString("usedMemory"), lua.LNumber(baseInfo.usedMemory))
 	t.RawSet(lua.LString("availableMemory"), lua.LNumber(baseInfo.availableMemory))
+	t.RawSet(lua.LString("memoryModel"), lua.LString(baseInfo.memoryModel))
 
 	t.RawSet(lua.LString("netIRate"), lua.LNumber(baseInfo.netIRate))
 	t.RawSet(lua.LString("netORate"), lua.LNumber(baseInfo.netORate))
@@ -397,6 +402,7 @@ func (baseInfo *BaseInfo) ToLuaTable(L *lua.LState) *lua.LTable {
 
 	t.RawSet(lua.LString("totalDisk"), lua.LNumber(baseInfo.totalDisk))
 	t.RawSet(lua.LString("freeDisk"), lua.LNumber(baseInfo.freeDisk))
+	t.RawSet(lua.LString("diskModel"), lua.LString(baseInfo.diskModel))
 
 	if baseInfo.agentInfo != nil {
 		t.RawSet(lua.LString("workingDir"), lua.LString(baseInfo.agentInfo.WorkingDir))
