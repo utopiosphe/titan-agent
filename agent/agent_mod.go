@@ -361,8 +361,8 @@ func (am *AgentModule) chmod(L *lua.LState) int {
 func (am *AgentModule) exec(L *lua.LState) int {
 	command := L.CheckString(1)
 	timeout := time.Duration(L.OptInt64(2, ExecTimeout)) * time.Second
-	envs := L.CheckString(3)
-	needPrint := L.OptBool(4, false)
+	needPrint := L.OptBool(3, false)
+	envs := L.OptString(4, "")
 
 	args := strings.Split(command, " ")
 	newArgs := make([]string, 0, len(args))
