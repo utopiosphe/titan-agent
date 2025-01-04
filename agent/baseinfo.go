@@ -91,7 +91,7 @@ type BaseInfo struct {
 func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 	info, err := host.Info()
 	if err != nil {
-		log.Fatalf("Get host info failed: %v", err)
+		log.Printf("Get host info failed: %v", err)
 	}
 
 	baseInfo := &BaseInfo{agentInfo: agentInfo, appInfo: appInfo}
@@ -106,7 +106,10 @@ func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 	}
 
 	var macs = ""
-	interfaces, _ := net.Interfaces()
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		log.Printf("Get interfaces failed: %v", err)
+	}
 	for _, interf := range interfaces {
 		macs += fmt.Sprintf("%s:%s,", interf.Name, interf.HardwareAddr)
 	}
@@ -124,14 +127,22 @@ func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 	}
 
 	// gpu
-	gpuInfo, _ := ghw.GPU()
+	gpuInfo, err := ghw.GPU()
+	if err != nil {
+		log.Printf("Get GPU info failed: %v", err)
+	}
 	if gpuInfo != nil && len(gpuInfo.GraphicsCards) > 0 {
 		last := gpuInfo.GraphicsCards[len(gpuInfo.GraphicsCards)-1]
-		baseInfo.gpu = fmt.Sprintf("%s, %s", last.DeviceInfo.Vendor.ID, last.DeviceInfo.Product.Name)
+		if last.DeviceInfo != nil && last.DeviceInfo.Vendor != nil && last.DeviceInfo.Product != nil {
+			baseInfo.gpu = fmt.Sprintf("%s, %s", last.DeviceInfo.Vendor.ID, last.DeviceInfo.Product.Name)
+		}
 	}
 
 	// memory info
-	memory, _ := mem.VirtualMemory()
+	memory, err := mem.VirtualMemory()
+	if err != nil {
+		log.Printf("Get memory info failed: %v", err)
+	}
 	if memory != nil {
 		baseInfo.totalMemory = int64(memory.Total)
 		baseInfo.usedMemory = int64(memory.Used)
@@ -139,13 +150,19 @@ func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 	}
 
 	// ram info
-	m, _ := ghw.Memory()
+	m, err := ghw.Memory()
+	if err != nil {
+		log.Printf("Get memory info failed: %v", err)
+	}
 	if m != nil && len(m.Modules) > 0 {
 		baseInfo.memoryModel = m.Modules[0].Vendor
 	}
 
 	// blk info
-	blk, _ := ghw.Block()
+	blk, err := ghw.Block()
+	if err != nil {
+		log.Printf("Get disk info failed: %v", err)
+	}
 	if blk != nil && len(blk.Disks) > 0 {
 		var disks []string
 		for _, d := range blk.Disks {
@@ -154,7 +171,10 @@ func NewBaseInfo(agentInfo *AgentInfo, appInfo *AppInfo) *BaseInfo {
 		baseInfo.diskModel = strings.Join(disks, ", ")
 	}
 
-	baseboard, _ := ghw.Baseboard()
+	baseboard, err := ghw.Baseboard()
+	if err != nil {
+		log.Printf("Get baseboard info failed: %v", err)
+	}
 	if baseboard != nil {
 		baseInfo.baseboard = fmt.Sprintf("Vendor:%s,Product:%s", baseboard.Vendor, baseboard.Product)
 	}
