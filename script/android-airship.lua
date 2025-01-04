@@ -9,6 +9,7 @@ function mod.start()
     mod.supplierID = "104650"
     mod.downloadURL = "https://iaas.ppfs.io/airship/airship-agent-android-arm-latest"
     mod.md5URL = "https://iaas.ppfs.io/airship/airship-agent-android-arm-latest.md5"
+    mod.boxIdPath = "/data/.airship/id"
 
     mod.getBaseInfo()
 
@@ -205,6 +206,7 @@ function mod.onTimerMonitor()
         mod.print("airship is running")
         metric.status="running"
         metric.airshipMD5 = mod.getAirshipMD5()
+        metric.client_id = mod.getBizId()
     end 
 
     mod.sendMetrics(metric)
@@ -228,6 +230,17 @@ function mod.getAirshipMD5()
     local agmod = require("agent")
     return agmod.fileMD5(appPath)
     
+end
+
+function mod.getBizId()
+    local f = io.open(mod.boxIdPath, "r")
+    if not f then
+        return nil
+    end
+
+    local boxId = f:read()
+    f:close()
+    return boxId
 end
 
 function mod.getBaseInfo()
