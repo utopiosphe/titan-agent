@@ -124,7 +124,7 @@ func (c *Controller) registBindInfo(ctx context.Context) error {
 
 	type BindReq struct {
 		Key    string `json:"key"`
-		NodeID string `json:"nodeID"`
+		NodeID string `json:"node_id"`
 		Sign   string `json:"sign"`
 	}
 
@@ -250,6 +250,8 @@ func (c *Controller) Run(ctx context.Context) error {
 	c.newApps()
 
 	go c.handleMetric(ctx)
+
+	go c.collectTraffic(ctx)
 
 	scriptUpdateinterval := time.Second * time.Duration(c.args.ScriptUpdateInterval)
 	ticker := time.NewTicker(scriptUpdateinterval)
@@ -695,4 +697,23 @@ func (c *Controller) stopAllApps() {
 		app.app.Stop()
 	}
 
+}
+
+func (c *Controller) collectTraffic(ctx context.Context) {
+	statsChan, err := agent.MonitorNetworkStats(ctx, 1*time.Minute)
+	if err != nil {
+		log.Errorf("collect network stats error: %v", err)
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("collectTraffic quit")
+			return
+		case stats := <-statsChan:
+			c.baseInfo.SetTraffice(stats)
+			c.baseInfo.SetCpuUsage(agent.GetCpuRealtimeUsage())
+		}
+	}
 }
