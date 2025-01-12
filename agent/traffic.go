@@ -73,7 +73,7 @@ func getNetworkStats() (NetworkStats, error) {
 	switch runtime.GOOS {
 	case "darwin":
 		return getNetworkStatsMacOS()
-	case "linux":
+	case "linux", "android":
 		return getNetworkStatsLinux()
 	case "windows":
 		return getNetworkStatsWindows()
