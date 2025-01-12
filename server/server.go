@@ -22,7 +22,7 @@ type Server struct {
 }
 
 func NewServer(config *Config) (*Server, error) {
-	redis := redis.NewRedis(config.RedisAddr)
+	redis := redis.NewRedis(config.RedisAddr, config.RedisPass)
 	if config.PrivateKey == "" {
 		return nil, jwt.ErrHMACMissingKey
 	}

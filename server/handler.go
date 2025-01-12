@@ -416,11 +416,13 @@ func (h *ServerHandler) handleGetAppInfo(w http.ResponseWriter, r *http.Request)
 		NodeID  string `json:"nodeID"`
 	}{}
 
-	err = json.Unmarshal([]byte(app.Metric), &res)
-	if err != nil {
-		apiResultErr(w, err.Error())
-		return
-	}
+	// app.Metric.UnmarshalJSON()
+
+	// err = json.Unmarshal([]byte(app.Metric), &res)
+	// if err != nil {
+	// 	apiResultErr(w, err.Error())
+	// 	return
+	// }
 
 	if app.AppName == "titan-l2" && len(res.NodeID) == 0 {
 		apiResultErr(w, "titan-l2 not exist")
@@ -515,11 +517,18 @@ type NodeAppWebInfo struct {
 func (h *ServerHandler) handleGetAllNodesAppInfosList(w http.ResponseWriter, r *http.Request) {
 
 	lastActivityTime := r.URL.Query().Get("last_activity_time")
+	nodeid := r.URL.Query().Get("node_id")
+	tag := r.URL.Query().Get("tag")
+	clientid := r.URL.Query().Get("client_id")
+	appname := r.URL.Query().Get("app_name")
+
 	lastActivityTimeInt, _ := strconv.Atoi(lastActivityTime)
 
 	latTime := time.Unix(int64(lastActivityTimeInt), 0)
 
-	nodeApps, err := h.redis.GetAllAppInfos(r.Context(), latTime)
+	nodeApps, err := h.redis.GetAllAppInfos(r.Context(), latTime, redis.AppInfoFileter{
+		NodeID: nodeid, Tag: tag, ClientID: clientid, AppName: appname,
+	})
 	if err != nil {
 		apiResultErr(w, fmt.Sprintf("find apps list failed: %s", err.Error()))
 		return
@@ -545,7 +554,7 @@ func (h *ServerHandler) handleGetAllNodesAppInfosList(w http.ResponseWriter, r *
 			LastActivityTime: nodeApp.LastActivityTime,
 			NodeID:           nodeApp.NodeID,
 			Channel:          channelRefMap[nodeApp.AppName],
-			ClientID:         nodeApp.Metric.GetClientID(),
+			ClientID:         redis.GetClientID(nodeApp.Metric, tagRefMap[nodeApp.AppName]),
 			Tag:              tagRefMap[nodeApp.AppName],
 		}
 	}
@@ -700,8 +709,7 @@ func (h *ServerHandler) handlePushMetrics(w http.ResponseWriter, r *http.Request
 		resultError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	log.Infof("[PushMetrics] NodeID:%s, apps: %v", payload.NodeID, apps)
+	log.Infof("[PushMetrics] NodeID:%s, apps: %v, body: %s", payload.NodeID, apps, string(b))
 
 	if err := h.updateNodeApps(payload.NodeID, apps); err != nil {
 		log.Error("ServerHandler.handlePushMetrics update nodes app failed:", err.Error())
@@ -723,36 +731,36 @@ func (h *ServerHandler) handlePushMetrics(w http.ResponseWriter, r *http.Request
 func (h *ServerHandler) updateNodeApps(nodeID string, apps []*App) error {
 	nodeApps := make([]*redis.NodeApp, 0, len(apps))
 	for _, app := range apps {
-		nodeApps = append(nodeApps, &redis.NodeApp{AppName: app.AppName, MD5: app.ScriptMD5, Metric: redis.MetricString(app.Metric)})
+		nodeApps = append(nodeApps, &redis.NodeApp{AppName: app.AppName, MD5: app.ScriptMD5, Metric: app.Metric})
 	}
-	appNames, err := h.redis.GetNodeAppList(context.Background(), nodeID)
-	if err != nil {
-		return err
-	}
+	// appNames, err := h.redis.GetNodeAppList(context.Background(), nodeID)
+	// if err != nil {
+	// 	return err
+	// }
 
-	oldApps, err := h.redis.GetNodeApps(context.Background(), nodeID, appNames)
-	if err != nil {
-		return err
-	}
+	// oldApps, err := h.redis.GetNodeApps(context.Background(), nodeID, appNames)
+	// if err != nil {
+	// 	return err
+	// }
 
-	oldAppMap := make(map[string]*redis.NodeApp)
-	for _, app := range oldApps {
-		oldAppMap[app.AppName] = app
-	}
+	// oldAppMap := make(map[string]*redis.NodeApp)
+	// for _, app := range oldApps {
+	// 	oldAppMap[app.AppName] = app
+	// }
 
-	for _, app := range nodeApps {
-		if oldApp := oldAppMap[app.AppName]; oldApp != nil {
-			if len(app.Metric) == 0 && len(oldApp.Metric) != 0 {
-				app.Metric = oldApp.Metric
-			}
-		}
-	}
+	// for _, app := range nodeApps {
+	// 	if oldApp := oldAppMap[app.AppName]; oldApp != nil {
+	// 		if len(app.Metric) != 0 && len(oldApp.Metric) != 0 {
+	// 			app.Metric = oldApp.Metric
+	// 		}
+	// 	}
+	// }
 
-	if err = h.redis.DeleteNodeApps(context.Background(), nodeID, appNames); err != nil {
-		return err
-	}
+	// if err = h.redis.DeleteNodeApps(context.Background(), nodeID, appNames); err != nil {
+	// 	return err
+	// }
 
-	if err = h.redis.SetNodeApps(context.Background(), nodeID, nodeApps); err != nil {
+	if err := h.redis.SetNodeApps(context.Background(), nodeID, nodeApps); err != nil {
 		return err
 	}
 

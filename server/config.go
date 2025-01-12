@@ -12,6 +12,7 @@ import (
 )
 
 type Config struct {
+	ListenOn          string            `json:"listenOn" yaml:"listenOn"`
 	DefaultLuaScript  string            `json:"defaultLuaScript" yaml:"defaultLuaScript"`
 	DefaultController map[string]string `json:"defaultController" yaml:"defaultController"`
 	DefaultApp        map[string]string `json:"defaultApp" yaml:"defaultApp"`
@@ -25,6 +26,7 @@ type Config struct {
 	ChannelApps        map[string][]string  `json:"channelApps" yaml:"channelApps"`
 
 	RedisAddr  string `json:"redisAddr" yaml:"redisAddr"`
+	RedisPass  string `json:"redisPass" yaml:"redisPass"`
 	PrivateKey string `json:"privateKey" yaml:"privateKey"`
 }
 

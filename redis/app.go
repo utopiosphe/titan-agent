@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -25,37 +24,10 @@ type App struct {
 // NodeApp Information that is unique to the node
 // Metric includes the app's operational status, as well as unique information
 type NodeApp struct {
-	AppName          string       `redis:"appName"`
-	MD5              string       `redis:"md5"`
-	Metric           MetricString `redis:"metric"`
-	LastActivityTime time.Time    `redis:"lastActivityTime"`
-}
-
-type MetricString string
-
-func (m MetricString) GetClientID() string {
-	var metric NodeAppBaseMetrics
-	json.Unmarshal([]byte(m), &metric)
-	return metric.ClientID
-}
-
-func (m *MetricString) UnmarshalJSON(data []byte) error {
-	*m = MetricString(data)
-	return nil
-}
-
-func (m MetricString) MarshalJSON() ([]byte, error) {
-	return []byte(m), nil
-}
-
-func (m MetricString) MarshalBinary() ([]byte, error) {
-	return []byte(m), nil
-}
-
-type NodeAppBaseMetrics struct {
-	ClientID string `json:"client_id"` // third-party unique id
-	Status   string `json:"status"`
-	Err      string `json:"err"`
+	AppName          string    `redis:"appName"`
+	MD5              string    `redis:"md5"`
+	Metric           string    `redis:"metric"`
+	LastActivityTime time.Time `redis:"lastActivityTime"`
 }
 
 func (redis *Redis) SetApp(ctx context.Context, app *App) error {
@@ -305,7 +277,14 @@ type NodeAppExtra struct {
 	NodeID string
 }
 
-func (r *Redis) GetAllAppInfos(ctx context.Context, lastActiveTime time.Time) ([]*NodeAppExtra, error) {
+type AppInfoFileter struct {
+	NodeID   string
+	Tag      string
+	ClientID string
+	AppName  string
+}
+
+func (r *Redis) GetAllAppInfos(ctx context.Context, lastActiveTime time.Time, f AppInfoFileter) ([]*NodeAppExtra, error) {
 
 	var (
 		cursor uint64
@@ -328,17 +307,30 @@ func (r *Redis) GetAllAppInfos(ctx context.Context, lastActiveTime time.Time) ([
 				continue
 			}
 
-			var n NodeAppExtra
+			var (
+				n NodeAppExtra
+			)
+
 			if err := res.Scan(&n.NodeApp); err != nil {
 				// return nil, err
 				log.Printf("Error scan node: %v", err)
 				continue
 			}
 
+			if f.NodeID != "" && f.NodeID != n.NodeID {
+				continue
+			}
+
+			if f.ClientID != "" && GetClientID(n.Metric, n.AppName) != f.ClientID {
+				continue
+			}
+
+			if f.AppName != "" && f.AppName != n.AppName {
+				continue
+			}
+
 			//titan:agent:nodeApp:%s:%s
 			n.NodeID = strings.Split(key, ":")[3]
-
-			// fmt.Println(n)
 
 			if n.LastActivityTime.After(lastActiveTime) {
 				ret = append(ret, &n)

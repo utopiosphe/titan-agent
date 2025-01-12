@@ -29,11 +29,11 @@ var runCmd = &cli.Command{
 	Name:  "run",
 	Usage: "run agent server",
 	Flags: []cli.Flag{
-		&cli.StringFlag{
-			Name:  "listen",
-			Usage: "--listen=0.0.0.0:8080",
-			Value: "0.0.0.0:8080",
-		},
+		// &cli.StringFlag{
+		// 	Name:  "listen",
+		// 	Usage: "--listen=0.0.0.0:8080",
+		// 	Value: "0.0.0.0:8080",
+		// },
 		&cli.StringFlag{
 			Name:  "file-server",
 			Usage: "--file-server ./my-file-server",
@@ -50,7 +50,7 @@ var runCmd = &cli.Command{
 		return nil
 	},
 	Action: func(cctx *cli.Context) error {
-		listenAddress := cctx.String("listen")
+		// listenAddress := cctx.String("listen")
 		configFilePath := cctx.String("config")
 		fileServerDir := cctx.String("file-server")
 
@@ -68,9 +68,9 @@ var runCmd = &cli.Command{
 		http.Handle("/", http.FileServer(http.Dir(fileServerDir)))
 
 		// Start the server
-		fmt.Println("Starting server on ", listenAddress)
+		fmt.Println("Starting server on ", config.ListenOn)
 		go func() {
-			err := http.ListenAndServe(listenAddress, s)
+			err := http.ListenAndServe(config.ListenOn, s)
 			if err != nil {
 				fmt.Println("Start server failed ", err.Error())
 			}

@@ -14,7 +14,7 @@ const (
 func TestNode(t *testing.T) {
 	t.Logf("TestNode")
 
-	redis := NewRedis(redisAddr)
+	redis := NewRedis(redisAddr, "")
 
 	node := Node{
 		ID:       uuid.NewString(),
@@ -37,7 +37,7 @@ func TestNode(t *testing.T) {
 func TestApp(t *testing.T) {
 	t.Logf("TestApp")
 
-	redis := NewRedis(redisAddr)
+	redis := NewRedis(redisAddr, "")
 
 	app := App{
 		AppName: "titan-l2",
@@ -64,7 +64,7 @@ func TestApp(t *testing.T) {
 func TestApps(t *testing.T) {
 	t.Logf("TestApps")
 
-	redis := NewRedis(redisAddr)
+	redis := NewRedis(redisAddr, "")
 
 	app1 := App{
 		AppName: "titan-l2",
@@ -104,7 +104,7 @@ func TestApps(t *testing.T) {
 func TestNodeApp(t *testing.T) {
 	t.Logf("TestNodeApp")
 
-	redis := NewRedis(redisAddr)
+	redis := NewRedis(redisAddr, "")
 
 	app := NodeApp{
 		AppName: "titan-l2",
@@ -130,7 +130,7 @@ func TestNodeApp(t *testing.T) {
 func TestNodeApps(t *testing.T) {
 	t.Logf("TestNodeApps")
 
-	redis := NewRedis(redisAddr)
+	redis := NewRedis(redisAddr, "")
 
 	app1 := NodeApp{
 		AppName: "titan-l2",
@@ -165,7 +165,7 @@ func TestNodeApps(t *testing.T) {
 func TestNodeAppList(t *testing.T) {
 	t.Logf("TestNodeApps")
 
-	redis := NewRedis(redisAddr)
+	redis := NewRedis(redisAddr, "")
 
 	nodeID := uuid.NewString()
 
@@ -185,7 +185,7 @@ func TestNodeAppList(t *testing.T) {
 func TestDeleteNodeAppList(t *testing.T) {
 	t.Logf("TestNodeApps")
 
-	redis := NewRedis(redisAddr)
+	redis := NewRedis(redisAddr, "")
 
 	nodeID := "52b67296-940c-434e-85f3-16df4aa9c6ed"
 
