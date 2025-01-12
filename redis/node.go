@@ -52,6 +52,7 @@ type Node struct {
 	// AppList []*App
 
 	// WorkingDir string
+	Version string `redis:"version"`
 	Channel string `redis:"channel"`
 }
 
@@ -92,14 +93,15 @@ func (redis *Redis) GetNode(ctx context.Context, nodeID string) (*Node, error) {
 	return &n, nil
 }
 
-func (r *Redis) GetNodeList(ctx context.Context, lastActiveTime time.Time) ([]*Node, error) {
+func (r *Redis) GetNodeList(ctx context.Context, lastActiveTime time.Time, nodeid string) ([]*Node, error) {
 
 	var (
 		cursor uint64
 		ret    []*Node
 	)
 
-	nodeKeyPattern := strings.Replace(RedisKeyNode, "%s", "*", -1)
+	nodeLike := fmt.Sprintf("%s*", nodeid)
+	nodeKeyPattern := strings.Replace(RedisKeyNode, "%s", nodeLike, -1)
 	for {
 		keys, nextCursor, err := r.client.Scan(ctx, cursor, nodeKeyPattern, 100).Result()
 		if err != nil {

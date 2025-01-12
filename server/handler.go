@@ -170,6 +170,7 @@ func (h *ServerHandler) handleGetControllerConfig(w http.ResponseWriter, r *http
 	// version := r.URL.Query().Get("version")
 	os := r.URL.Query().Get("os")
 	uuid := r.URL.Query().Get("uuid")
+	arch := r.URL.Query().Get("arch")
 
 	var testControllerName string
 	testNode := h.config.TestNodes[uuid]
@@ -178,24 +179,38 @@ func (h *ServerHandler) handleGetControllerConfig(w http.ResponseWriter, r *http
 	}
 
 	var file *FileConfig = nil
+	var bestMatchFile *FileConfig = nil
+
 	for _, f := range h.config.ControllerFileList {
 		if len(testControllerName) > 0 {
 			if f.Name == testControllerName {
 				file = f
 				break
 			}
-		} else if f.OS == os {
-			file = f
-			break
+		}
+		if f.OS == os {
+			// common version
+			if f.Tag == "" && file == nil {
+				file = f
+				// arch match version
+			} else if f.Tag != "" && arch != "" && strings.Contains(f.Tag, arch) {
+				bestMatchFile = f
+				break
+			}
 		}
 	}
 
-	if file == nil {
+	var finalFile *FileConfig = file
+	if bestMatchFile != nil {
+		finalFile = bestMatchFile
+	}
+
+	if finalFile == nil {
 		resultError(w, http.StatusBadRequest, fmt.Sprintf("can not find the os %s", os))
 		return
 	}
 
-	buf, err := json.Marshal(file)
+	buf, err := json.Marshal(finalFile)
 	if err != nil {
 		resultError(w, http.StatusBadRequest, err.Error())
 		return
@@ -430,6 +445,7 @@ type NodeWebInfo struct {
 	*redis.Node
 	State          int   // 0 exception, 1 online, 2 offline
 	OnlineDuration int64 // online minutes
+	OnlineRate     float64
 }
 
 const (
@@ -440,6 +456,7 @@ const (
 
 func (h *ServerHandler) handleGetNodeList(w http.ResponseWriter, r *http.Request) {
 	lastActivityTime := r.URL.Query().Get("last_activity_time")
+	nodeid := r.URL.Query().Get("node_id")
 
 	lastActivityTimeInt, _ := strconv.Atoi(lastActivityTime)
 
@@ -451,7 +468,7 @@ func (h *ServerHandler) handleGetNodeList(w http.ResponseWriter, r *http.Request
 
 	latTime := time.Unix(int64(lastActivityTimeInt), 0)
 
-	nodes, err := h.redis.GetNodeList(context.Background(), latTime)
+	nodes, err := h.redis.GetNodeList(context.Background(), latTime, nodeid)
 	if err != nil {
 		apiResultErr(w, fmt.Sprintf("find node list failed: %s", err.Error()))
 		return
@@ -466,6 +483,10 @@ func (h *ServerHandler) handleGetNodeList(w http.ResponseWriter, r *http.Request
 			ret[i].State = NodeStateOnline
 		}
 		ret[i].OnlineDuration, _ = h.redis.GetNodeOnlineDuration(r.Context(), node.ID)
+		rinfo, _ := h.redis.GetNodeRegistInfo(r.Context(), node.ID)
+		if rinfo != nil {
+			ret[i].OnlineRate = float64(ret[i].OnlineDuration) / float64(time.Since(time.Unix(rinfo.CreatedTime, 0)).Seconds())
+		}
 	}
 
 	result := APIResult{Data: ret}

@@ -499,7 +499,7 @@ func (c *Controller) updateAppsFromServer() (bool, error) {
 
 		newMD5 := fmt.Sprintf("%x", md5.Sum(scriptContent))
 		if newMD5 != appConfig.ScriptMD5 {
-			log.Errorf("Controller.updateAppConfigAndScriptFromServer script md5 not match")
+			log.Errorf("Controller.updateAppConfigAndScriptFromServer script md5 not match, AppName: %s. server md5: %s. download md5: %s", appConfig.AppName, appConfig.ScriptMD5, newMD5)
 			return false, err
 		}
 
